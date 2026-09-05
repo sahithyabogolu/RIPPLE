@@ -1,13 +1,8 @@
-// ==========================================
-// RIPPLE ENGINE — TIER 1 & SYNTHETIC GEN
-// ==========================================
-
 const FX_RATES = {
   INR: 1.0, USD: 83.25, EUR: 90.15, GBP: 105.40, AED: 22.66,
   JPY: 0.56, CNY: 11.50, SGD: 61.80, AUD: 54.30, CAD: 61.10
 };
 
-// Seeded Pseudo-Random Generator
 function PRNG(seed) {
   let s = seed;
   return function() {
@@ -16,7 +11,6 @@ function PRNG(seed) {
   };
 }
 
-// 1. Synthetic Data & Ground Truth Generator
 function generateBatch(seed = 42, size = 50) {
   const rng = PRNG(seed);
   const records = [];
@@ -54,7 +48,6 @@ function generateBatch(seed = 42, size = 50) {
       }
     };
 
-    // Inject Deliberate Issues
     if (issue === 'FEE_MISMATCH') {
       rec.gateway.feeDeducted = Math.round(baseAmount * 0.08);
       rec.gateway.netAmount = baseAmount - rec.gateway.feeDeducted;
@@ -73,7 +66,6 @@ function generateBatch(seed = 42, size = 50) {
   return { records, groundTruthKeys };
 }
 
-// 2. Deterministic Pipeline Execution
 function runPipeline(records, keys, selectedCurrency = 'INR') {
   const startTime = performance.now();
   const exceptions = [];
@@ -135,13 +127,11 @@ function runPipeline(records, keys, selectedCurrency = 'INR') {
   };
 }
 
-// 3. UI Render Bridge
 function runJudgeMode() {
   const batch = generateBatch(1337, 50);
   const selectedCurrency = document.getElementById('currency-select')?.value || 'INR';
   const report = runPipeline(batch.records, batch.groundTruthKeys, selectedCurrency);
 
-  // Update Scorecard KPIs
   document.getElementById('kpi-throughput').innerText = `${report.processed} records`;
   document.getElementById('kpi-throughput-sub').innerText = `Processed in ${report.latencyMs}ms (${Math.round(report.processed / (report.latencyMs / 1000))} rec/sec)`;
 
@@ -153,7 +143,6 @@ function runJudgeMode() {
 
   document.getElementById('kpi-exceptions').innerText = report.exceptions.length;
 
-  // Render Table Rows
   const tbody = document.getElementById('exception-rows');
   if (tbody) {
     tbody.innerHTML = report.exceptions.map(ex => `
@@ -169,7 +158,6 @@ function runJudgeMode() {
   }
 }
 
-// Auto-boot Judge Mode when page loads
 window.addEventListener('DOMContentLoaded', () => {
   runJudgeMode();
 });
