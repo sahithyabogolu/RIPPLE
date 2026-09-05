@@ -11,11 +11,12 @@
 
   <meta
     name="description"
-    content="RIPPLE transforms financial data into a verified cash position, risk signals, and practical liquidity decisions."
+    content="RIPPLE turns financial data into clear cash-flow insights, risks, and practical next steps."
   />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
   <link
     href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
     rel="stylesheet"
@@ -23,6 +24,7 @@
 
   <link rel="stylesheet" href="style.css" />
 
+  <!-- Spreadsheet reader -->
   <script
     src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"
     defer
@@ -32,299 +34,695 @@
 </head>
 
 <body>
+  <!-- Ambient background -->
   <div class="ambient ambient-one"></div>
   <div class="ambient ambient-two"></div>
 
+  <div class="ripple-orbit ripple-orbit-one"></div>
+  <div class="ripple-orbit ripple-orbit-two"></div>
+
+  <!-- Welcome modal -->
+  <div
+    class="modal-overlay hidden"
+    id="welcomeModal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="welcomeTitle"
+  >
+    <div class="modal-card">
+      <div class="modal-symbol">R</div>
+
+      <p class="eyebrow">
+        <span></span>
+        YOUR PRIVATE WORKSPACE
+      </p>
+
+      <h2 id="welcomeTitle">Let’s make your numbers clearer.</h2>
+
+      <p class="modal-description">
+        What should we call you? Your name stays in this browser and is only
+        used to personalise your RIPPLE workspace.
+      </p>
+
+      <label class="field-label" for="userNameInput">
+        Your name
+      </label>
+
+      <input
+        type="text"
+        id="userNameInput"
+        class="text-input"
+        placeholder="Enter your name"
+        maxlength="40"
+        autocomplete="given-name"
+      />
+
+      <div class="modal-actions">
+        <button
+          type="button"
+          class="primary-button"
+          id="saveNameButton"
+        >
+          Enter workspace
+          <span>↗</span>
+        </button>
+      </div>
+
+      <p class="privacy-note">
+        No account required. Your workspace remains local to this browser.
+      </p>
+    </div>
+  </div>
+
+  <!-- Privacy/settings modal -->
+  <div
+    class="modal-overlay hidden"
+    id="privacyModal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="privacyTitle"
+  >
+    <div class="modal-card privacy-card">
+      <div class="modal-heading">
+        <div>
+          <p class="eyebrow">
+            <span></span>
+            PRIVACY CONTROLS
+          </p>
+
+          <h2 id="privacyTitle">Your data, your choice.</h2>
+        </div>
+
+        <button
+          type="button"
+          class="icon-button"
+          id="closePrivacyButton"
+          aria-label="Close privacy controls"
+        >
+          ×
+        </button>
+      </div>
+
+      <p class="modal-description">
+        RIPPLE does not send your financial files to a server. Saved workspace
+        records are stored locally in this browser.
+      </p>
+
+      <div class="privacy-option">
+        <div>
+          <strong>Save analyses locally</strong>
+          <p>
+            Store analysis summaries, file names, and dates in your browser.
+            Your original spreadsheet is not stored.
+          </p>
+        </div>
+
+        <label class="switch">
+          <input
+            type="checkbox"
+            id="saveAnalysesToggle"
+          />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+
+      <div class="privacy-actions">
+        <button
+          type="button"
+          class="secondary-button danger-button"
+          id="clearWorkspaceButton"
+        >
+          Clear saved workspace
+        </button>
+      </div>
+
+      <p
+        class="privacy-feedback"
+        id="privacyFeedback"
+        aria-live="polite"
+      ></p>
+    </div>
+  </div>
+
+  <!-- Header -->
   <header class="site-header">
-    <a class="brand" href="#">
+    <a
+      href="#top"
+      class="brand"
+      aria-label="RIPPLE home"
+    >
       <span class="brand-mark">R</span>
       <span class="brand-name">RIPPLE</span>
     </a>
 
-    <div class="header-status">
-      <span class="status-dot"></span>
-      Finance control workspace
+    <div class="header-actions">
+      <div class="header-status">
+        <span class="status-dot"></span>
+        <span id="headerGreeting">Finance control workspace</span>
+      </div>
+
+      <button
+        type="button"
+        class="header-button hidden"
+        id="openWorkspaceButton"
+      >
+        Workspace
+      </button>
+
+      <button
+        type="button"
+        class="header-button"
+        id="openPrivacyButton"
+      >
+        Privacy
+      </button>
     </div>
   </header>
 
-  <main class="page-shell">
-    <section class="hero-section">
+  <main id="top">
+    <!-- Hero -->
+    <section class="page-shell hero-section">
       <div class="hero-copy">
-        <div class="eyebrow">
+        <p class="eyebrow">
           <span></span>
-          FINANCE CONTROL WORKSPACE
-        </div>
+          FINANCE CONTROL, SIMPLIFIED
+        </p>
 
         <h1>
           Know your cash.
           <em>Know what to do next.</em>
         </h1>
 
-        <p class="hero-description">
-          Turn financial data into a verified cash position, clear exception
-          signals, and practical liquidity decisions — without forcing your
-          business into a fixed spreadsheet template.
+        <p class="hero-description" id="heroDescription">
+          RIPPLE turns your financial data into a clear view of cash,
+          collections, upcoming bills, and practical decisions.
         </p>
 
         <div class="hero-points">
           <div>
             <span>01</span>
-            <p>Understand the available financial data</p>
+            <p>Upload one financial file and receive a focused analysis.</p>
           </div>
 
           <div>
             <span>02</span>
-            <p>Validate numbers, dates, currencies and exceptions</p>
+            <p>See risks, evidence, and recommended actions in one place.</p>
           </div>
 
           <div>
             <span>03</span>
-            <p>Convert evidence into the next financial action</p>
+            <p>Test different collection and payment scenarios instantly.</p>
           </div>
         </div>
       </div>
 
+      <!-- Upload card -->
       <div class="upload-card">
         <div class="card-topline">
-          <span class="card-label">START ANALYSIS</span>
-          <span class="secure-label">Private workspace</span>
+          <span class="card-label">START AN ANALYSIS</span>
+          <span class="secure-label">Local-first workspace</span>
         </div>
 
-        <div class="upload-icon">
+        <div class="upload-icon" aria-hidden="true">
           <svg
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
             stroke-width="1.5"
           >
-            <path d="M12 16V4" />
-            <path d="M7 9l5-5 5 5" />
-            <path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" />
+            <path d="M12 16V4"></path>
+            <path d="M7 9l5-5 5 5"></path>
+            <path d="M5 20h14"></path>
           </svg>
         </div>
 
-        <h2>Analyse your financial file</h2>
+        <h2>Bring your numbers.</h2>
 
         <p>
-          Upload an Excel or CSV file. RIPPLE identifies the available
-          structure and adapts its analysis to your data.
+          Upload an Excel or CSV file containing transactions, receivables,
+          payables, or cash-flow forecasts.
         </p>
 
-        <label class="upload-button" for="csvFile">
-          <span>Upload financial file</span>
+        <label
+          for="csvFile"
+          class="upload-button"
+        >
+          <span>Choose financial file</span>
           <span class="button-arrow">↗</span>
         </label>
 
         <input
-          id="csvFile"
           type="file"
+          id="csvFile"
           accept=".xlsx,.xls,.csv"
         />
 
         <button
-          id="sampleButton"
-          class="sample-button"
           type="button"
+          class="sample-button"
+          id="sampleButton"
         >
-          Explore a sample workspace
+          <span>Explore a fictional demo workspace</span>
           <span>→</span>
         </button>
 
         <div class="file-status">
-          <span class="file-status-icon">○</span>
+          <span class="file-status-icon">◌</span>
           <span id="fileName">No file selected</span>
         </div>
 
-        <p id="statusMessage" class="status-message">
-          Ready for a financial file
-        </p>
+        <p
+          class="status-message"
+          id="statusMessage"
+          aria-live="polite"
+        ></p>
 
-        <p id="errorMessage" class="error-message"></p>
+        <p
+          class="error-message"
+          id="errorMessage"
+          aria-live="assertive"
+        ></p>
       </div>
     </section>
 
-    <section class="trust-strip">
+    <!-- Trust strip -->
+    <section class="page-shell trust-strip">
       <div>
         <span class="trust-icon">◈</span>
-        Flexible file structures
-      </div>
-
-      <div>
-        <span class="trust-icon">◌</span>
-        Multi-currency aware
+        <span>Local-first analysis</span>
       </div>
 
       <div>
         <span class="trust-icon">⌁</span>
-        Evidence-led decisions
+        <span>Clear financial evidence</span>
       </div>
 
       <div>
-        <span class="trust-icon">✓</span>
-        Human review preserved
+        <span class="trust-icon">↗</span>
+        <span>Scenario-based decisions</span>
+      </div>
+
+      <div>
+        <span class="trust-icon">✦</span>
+        <span>No accounting jargon overload</span>
       </div>
     </section>
 
-    <section id="dashboard" class="dashboard hidden">
-      <div class="dashboard-heading">
+    <!-- Workspace -->
+    <section
+      class="page-shell workspace-section hidden"
+      id="workspaceSection"
+    >
+      <div class="workspace-heading">
         <div>
-          <div class="eyebrow">
+          <p class="eyebrow">
             <span></span>
-            CONTROL CENTRE
-          </div>
+            PRIVATE WORKSPACE
+          </p>
 
-          <h2>Financial control overview</h2>
+          <h2 id="workspaceTitle">Your analysis workspace.</h2>
 
           <p>
-            Your results are based only on the financial information RIPPLE
-            could reliably identify.
+            Revisit saved analyses or start a fresh review.
           </p>
         </div>
 
-        <button id="resetButton" class="secondary-button" type="button">
-          Analyse another file
+        <button
+          type="button"
+          class="secondary-button"
+          id="newAnalysisButton"
+        >
+          New analysis
         </button>
       </div>
 
-      <div class="kpi-grid">
-        <article class="kpi-card featured">
-          <div class="kpi-label">IDENTIFIED CASH POSITION</div>
-          <div id="cashValue" class="kpi-value">Unavailable</div>
-          <p>Based on available cash or forecast data</p>
-        </article>
-
-        <article class="kpi-card">
-          <div class="kpi-label">RECEIVABLES EXPOSURE</div>
-          <div id="receivablesValue" class="kpi-value">Unavailable</div>
-          <p>Outstanding customer balances</p>
-        </article>
-
-        <article class="kpi-card">
-          <div class="kpi-label">PAYABLES EXPOSURE</div>
-          <div id="billsValue" class="kpi-value">Unavailable</div>
-          <p>Outstanding supplier obligations</p>
-        </article>
-      </div>
-
-      <div class="dashboard-grid">
-        <article class="panel risk-panel">
+      <div class="workspace-layout">
+        <aside class="workspace-sidebar panel">
           <div class="panel-heading">
             <div>
-              <span class="panel-kicker">01 / RISK SIGNAL</span>
-              <h3>Liquidity position</h3>
+              <span class="panel-kicker">HISTORY</span>
+              <h3>Saved analyses</h3>
             </div>
+
+            <span
+              class="panel-tag"
+              id="historyCount"
+            >
+              0 saved
+            </span>
           </div>
 
-          <div id="riskSummary" class="panel-content"></div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-heading">
-            <div>
-              <span class="panel-kicker">02 / DATA QUALITY</span>
-              <h3>What RIPPLE could verify</h3>
-            </div>
-          </div>
-
-          <div id="dataQuality" class="panel-content"></div>
-        </article>
-      </div>
-
-      <div class="dashboard-grid">
-        <article class="panel">
-          <div class="panel-heading">
-            <div>
-              <span class="panel-kicker">03 / CONTROLLER ALERTS</span>
-              <h3>Recommended next actions</h3>
-            </div>
-          </div>
-
-          <ul id="actionsList" class="action-list"></ul>
-        </article>
-
-        <article class="panel">
-          <div class="panel-heading">
-            <div>
-              <span class="panel-kicker">04 / EVIDENCE</span>
-              <h3>Analysis coverage</h3>
-            </div>
-          </div>
-
-          <ul id="evidenceList" class="evidence-list"></ul>
-        </article>
-      </div>
-
-      <article class="panel simulator-panel">
-        <div class="panel-heading">
-          <div>
-            <span class="panel-kicker">05 / SCENARIO ANALYSIS</span>
-            <h3>What happens if cash timing changes?</h3>
-          </div>
-
-          <span class="panel-tag">Illustrative scenario</span>
-        </div>
-
-        <div class="simulator-grid">
-          <div class="control-group">
-            <label for="collectionRate">
-              Receivables collected
-              <strong><span id="collectionRateLabel">50</span>%</strong>
-            </label>
-
-            <input
-              id="collectionRate"
-              type="range"
-              min="0"
-              max="100"
-              value="50"
-            />
-          </div>
-
-          <div class="control-group">
-            <label for="paymentDelay">
-              Payment delay
-              <strong><span id="paymentDelayLabel">0</span> days</strong>
-            </label>
-
-            <input
-              id="paymentDelay"
-              type="range"
-              min="0"
-              max="30"
-              value="0"
-            />
-          </div>
-
-          <button
-            id="simulateButton"
-            class="primary-button"
-            type="button"
+          <div
+            class="history-list"
+            id="historyList"
           >
-            Run scenario
-            <span>↗</span>
-          </button>
-        </div>
+            <div class="empty-history">
+              <span>◌</span>
+              <p>Your saved analyses will appear here.</p>
+            </div>
+          </div>
+        </aside>
 
-        <div id="simulationResult" class="simulation-result">
-          Adjust the assumptions and run a scenario.
-        </div>
-      </article>
+        <div class="workspace-main">
+          <!-- Dashboard -->
+          <div
+            class="dashboard hidden"
+            id="dashboard"
+          >
+            <div class="dashboard-heading">
+              <div>
+                <p class="eyebrow">
+                  <span></span>
+                  ANALYSIS OVERVIEW
+                </p>
 
-      <div class="decision-notice">
-        <span>ⓘ</span>
-        <p>
-          <strong>Decision-support notice:</strong>
-          RIPPLE provides automated data interpretation, validation,
-          calculations and scenario estimates. Review the underlying evidence
-          before making financial decisions.
-        </p>
+                <h2 id="dashboardTitle">
+                  Your cash position, clearly.
+                </h2>
+
+                <p id="dashboardSubtitle">
+                  A focused view of liquidity, obligations, and collection risk.
+                </p>
+              </div>
+
+              <div class="dashboard-actions">
+                <button
+                  type="button"
+                  class="secondary-button"
+                  id="saveCurrentAnalysisButton"
+                >
+                  Save analysis
+                </button>
+
+                <button
+                  type="button"
+                  class="secondary-button"
+                  id="deleteCurrentAnalysisButton"
+                >
+                  Delete
+                </button>
+
+                <button
+                  type="button"
+                  class="secondary-button"
+                  id="resetButton"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            <!-- KPI cards -->
+            <div class="kpi-grid">
+              <article class="kpi-card featured">
+                <span class="kpi-label">ESTIMATED CASH POSITION</span>
+
+                <div
+                  class="kpi-value"
+                  id="cashValue"
+                >
+                  ₹0
+                </div>
+
+                <p>
+                  Estimated cash available after expected movements.
+                </p>
+              </article>
+
+              <article class="kpi-card">
+                <span class="kpi-label">RECEIVABLES</span>
+
+                <div
+                  class="kpi-value"
+                  id="receivablesValue"
+                >
+                  ₹0
+                </div>
+
+                <p>
+                  Money expected to come into the business.
+                </p>
+              </article>
+
+              <article class="kpi-card">
+                <span class="kpi-label">UPCOMING BILLS</span>
+
+                <div
+                  class="kpi-value"
+                  id="billsValue"
+                >
+                  ₹0
+                </div>
+
+                <p>
+                  Recorded obligations that may affect liquidity.
+                </p>
+              </article>
+            </div>
+
+            <!-- Risk and evidence -->
+            <div class="dashboard-grid">
+              <article class="panel">
+                <div class="panel-heading">
+                  <div>
+                    <span class="panel-kicker">CONTROL SIGNAL</span>
+                    <h3>Cash-flow risk</h3>
+                  </div>
+
+                  <span
+                    class="panel-tag"
+                    id="riskScoreTag"
+                  >
+                    Score 0
+                  </span>
+                </div>
+
+                <div class="panel-content">
+                  <div
+                    class="risk-badge low"
+                    id="riskSummary"
+                  >
+                    Low risk
+                  </div>
+
+                  <p id="riskDescription">
+                    Your current dataset does not show a major liquidity concern.
+                  </p>
+
+                  <div
+                    class="warning-box hidden"
+                    id="riskWarning"
+                  >
+                    <strong>Watch these pressure points:</strong>
+
+                    <ul id="riskWarningList"></ul>
+                  </div>
+
+                  <div
+                    class="success-box"
+                    id="riskSuccess"
+                  >
+                    The current position appears manageable based on the
+                    information provided.
+                  </div>
+                </div>
+              </article>
+
+              <article class="panel">
+                <div class="panel-heading">
+                  <div>
+                    <span class="panel-kicker">DATA CONFIDENCE</span>
+                    <h3>What supports this view?</h3>
+                  </div>
+
+                  <span
+                    class="panel-tag"
+                    id="dataQuality"
+                  >
+                    Review
+                  </span>
+                </div>
+
+                <div class="panel-content">
+                  <p>
+                    RIPPLE explains the evidence behind each recommendation.
+                  </p>
+
+                  <ul
+                    class="evidence-list"
+                    id="evidenceList"
+                  ></ul>
+                </div>
+              </article>
+            </div>
+
+            <!-- Actions -->
+            <article class="panel action-panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="panel-kicker">NEXT BEST ACTIONS</span>
+                  <h3>What should you do next?</h3>
+                </div>
+
+                <span class="panel-tag">Decision support</span>
+              </div>
+
+              <div class="panel-content">
+                <ol
+                  class="action-list"
+                  id="actionsList"
+                ></ol>
+              </div>
+            </article>
+
+            <!-- Charts -->
+            <article class="panel chart-panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="panel-kicker">VISUAL CONTROL ROOM</span>
+                  <h3>See the numbers differently.</h3>
+                </div>
+
+                <div class="chart-switcher">
+                  <button
+                    type="button"
+                    class="chart-tab active"
+                    data-chart="bar"
+                  >
+                    Bar
+                  </button>
+
+                  <button
+                    type="button"
+                    class="chart-tab"
+                    data-chart="pie"
+                  >
+                    Pie
+                  </button>
+
+                  <button
+                    type="button"
+                    class="chart-tab"
+                    data-chart="line"
+                  >
+                    Line
+                  </button>
+                </div>
+              </div>
+
+              <div
+                class="chart-container"
+                id="chartContainer"
+              >
+                <div class="chart-empty">
+                  Your chart will appear after an analysis is loaded.
+                </div>
+              </div>
+
+              <div
+                class="chart-legend"
+                id="chartLegend"
+              ></div>
+            </article>
+
+            <!-- Scenario simulator -->
+            <article class="panel simulator-panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="panel-kicker">SCENARIO SIMULATOR</span>
+                  <h3>What if the situation changes?</h3>
+                </div>
+
+                <span class="panel-tag">Live scenario</span>
+              </div>
+
+              <div class="panel-content">
+                <p>
+                  Adjust the assumptions to see how collections and payment
+                  timing could influence your cash position.
+                </p>
+
+                <div class="simulator-grid">
+                  <div class="control-group">
+                    <label for="collectionRate">
+                      <span>Collection improvement</span>
+                      <strong id="collectionRateLabel">0%</strong>
+                    </label>
+
+                    <input
+                      type="range"
+                      id="collectionRate"
+                      min="0"
+                      max="100"
+                      value="0"
+                      step="5"
+                    />
+                  </div>
+
+                  <div class="control-group">
+                    <label for="paymentDelay">
+                      <span>Payment delay</span>
+                      <strong id="paymentDelayLabel">0 days</strong>
+                    </label>
+
+                    <input
+                      type="range"
+                      id="paymentDelay"
+                      min="0"
+                      max="30"
+                      value="0"
+                      step="1"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    class="primary-button"
+                    id="simulateButton"
+                  >
+                    Run scenario
+                    <span>↗</span>
+                  </button>
+                </div>
+
+                <div
+                  class="simulation-result"
+                  id="simulationResult"
+                  aria-live="polite"
+                >
+                  Move the sliders to explore a scenario.
+                </div>
+              </div>
+            </article>
+
+            <!-- Decision notice -->
+            <div class="decision-notice">
+              <span>✦</span>
+
+              <p>
+                <strong>Decision support, not a financial guarantee.</strong>
+                RIPPLE uses the information available in your uploaded file.
+                Confirm important decisions against your accounting records,
+                contracts, and actual cash position.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </main>
 
+  <!-- Footer -->
   <footer class="site-footer">
     <span>RIPPLE</span>
-    <span>Financial clarity for better decisions.</span>
+
+    <span>
+      Financial clarity for better decisions
+    </span>
+
+    <span>
+      Built by Sahithya
+    </span>
   </footer>
 </body>
 </html>
