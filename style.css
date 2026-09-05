@@ -1,5 +1,5 @@
 :root {
-  /* Dark Purple & Matte Black Palette */
+  /* Premium Dark Purple & Matte Black Palette */
   --bg-main: #07050A;
   --bg-surface: #0E0A14;
   --bg-card: #150F21;
@@ -15,7 +15,7 @@
   --text-muted: #A395B8;
   --text-dim: #6E6185;
   
-  /* Premium Purple / Accent Palette */
+  /* Vibrant Violet & Purple Accents */
   --accent-purple: #9D4EDD;
   --accent-glow: #C77DFF;
   --accent-violet: #7B2CBF;
@@ -30,7 +30,7 @@
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 20px;
-  --shadow-glow: 0 0 25px rgba(157, 78, 221, 0.15);
+  --shadow-glow: 0 0 25px rgba(157, 78, 221, 0.2);
 }
 
 * {
@@ -42,8 +42,8 @@
 body {
   background-color: var(--bg-main);
   background-image: 
-    radial-gradient(circle at 15% 15%, rgba(123, 44, 191, 0.12) 0%, transparent 40%),
-    radial-gradient(circle at 85% 85%, rgba(157, 78, 221, 0.08) 0%, transparent 40%);
+    radial-gradient(circle at 15% 15%, rgba(123, 44, 191, 0.15) 0%, transparent 40%),
+    radial-gradient(circle at 85% 85%, rgba(157, 78, 221, 0.1) 0%, transparent 40%);
   background-attachment: fixed;
   color: var(--text-main);
   font-family: var(--font-sans);
@@ -198,6 +198,15 @@ body {
   box-shadow: 0 0 10px rgba(157, 78, 221, 0.2);
 }
 
+.url-input-group {
+  display: flex;
+  gap: 10px;
+}
+
+.url-input-group .input-text {
+  flex: 1;
+}
+
 /* Layout Container */
 .main-container {
   max-width: 1280px;
@@ -211,7 +220,7 @@ body {
 /* Hero Section */
 .hero-section {
   display: grid;
-  grid-template-columns: 1fr 440px;
+  grid-template-columns: 1fr 460px;
   gap: 48px;
   align-items: start;
 }
@@ -321,7 +330,7 @@ body {
 }
 
 .upload-box p {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
   margin-bottom: 24px;
 }
@@ -329,7 +338,7 @@ body {
 .file-drop-zone {
   border: 2px dashed var(--border-color);
   border-radius: var(--radius-md);
-  padding: 32px 20px;
+  padding: 28px 16px;
   text-align: center;
   transition: all 0.25s ease;
   background: rgba(14, 10, 20, 0.5);
@@ -350,7 +359,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
 }
 
@@ -360,7 +369,7 @@ body {
 
 .action-divider {
   text-align: center;
-  margin: 20px 0;
+  margin: 18px 0;
   position: relative;
 }
 
@@ -380,9 +389,10 @@ body {
   padding: 0 12px;
   position: relative;
   z-index: 2;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--text-dim);
   letter-spacing: 1px;
+  font-weight: 700;
 }
 
 .file-status {
