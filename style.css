@@ -1,0 +1,196 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f5f7fb;
+  color: #172033;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 22px 8%;
+  background: white;
+  border-bottom: 1px solid #e5e9f0;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+header p {
+  margin: 0;
+  color: #687386;
+  font-size: 14px;
+}
+
+main {
+  width: 84%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.hero {
+  padding: 70px 0 40px;
+  text-align: center;
+}
+
+.hero h1 {
+  margin: 0 auto 18px;
+  max-width: 700px;
+  font-size: 48px;
+  line-height: 1.1;
+}
+
+.hero p {
+  margin: 0 auto 30px;
+  max-width: 600px;
+  color: #687386;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.upload-box {
+  display: inline-block;
+  padding: 22px;
+  background: white;
+  border: 2px dashed #b8c2d1;
+  border-radius: 14px;
+}
+
+input[type="file"] {
+  font-size: 14px;
+}
+
+.dashboard {
+  padding: 30px 0 60px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-bottom: 30px;
+}
+
+.metric-card,
+.panel {
+  background: white;
+  border: 1px solid #e5e9f0;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 8px 25px rgba(30, 45, 70, 0.04);
+}
+
+.metric-card p {
+  margin: 0 0 10px;
+  color: #687386;
+  font-size: 14px;
+}
+
+.metric-card h2 {
+  margin: 0;
+  font-size: 30px;
+}
+
+.panel {
+  margin-bottom: 24px;
+}
+
+.panel h2 {
+  margin-top: 0;
+  font-size: 22px;
+}
+
+#actionsList {
+  display: grid;
+  gap: 14px;
+}
+
+.action-item {
+  padding: 18px;
+  border-left: 5px solid #5267d9;
+  background: #f7f8fc;
+  border-radius: 10px;
+}
+
+.action-item strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.action-item span {
+  color: #687386;
+  line-height: 1.5;
+}
+
+button {
+  border: none;
+  border-radius: 9px;
+  padding: 13px 20px;
+  background: #5267d9;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #3f53c2;
+}
+
+.secondary-button {
+  background: #e9edf5;
+  color: #172033;
+}
+
+.secondary-button:hover {
+  background: #dce2ee;
+}
+
+#simulationResult {
+  margin-top: 18px;
+  padding: 18px;
+  background: #f7f8fc;
+  border-radius: 10px;
+  line-height: 1.6;
+}
+
+.hidden {
+  display: none;
+}
+
+footer {
+  padding: 30px;
+  text-align: center;
+  color: #687386;
+  font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  header {
+    padding: 20px;
+  }
+
+  main {
+    width: 90%;
+  }
+
+  .hero {
+    padding-top: 45px;
+  }
+
+  .hero h1 {
+    font-size: 36px;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+}
