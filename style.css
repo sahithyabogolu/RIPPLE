@@ -5,7 +5,7 @@
   --border-purple: #2e1065;
   --border-active: #6b21a8;
   --accent-purple: #a855f7;
-  --accent-[#7e22ce]: #7e22ce;
+  --accent-btn: #7e22ce;
   --text-main: #e0d8f0;
   --text-muted: #a78bfa;
   --status-green: #22c55e;
@@ -20,7 +20,6 @@ body {
   padding: 1.5rem;
 }
 
-/* Terminal Header Sequence */
 .terminal-banner {
   background-color: #140e21;
   border: 1px solid #3b0764;
@@ -30,7 +29,6 @@ body {
   border-radius: 6px;
 }
 
-/* Control Bar */
 .control-bar {
   background: var(--bg-dark-surface);
   border: 1px solid var(--border-purple);
@@ -43,9 +41,8 @@ body {
   gap: 1rem;
 }
 
-/* Judge Mode Button */
 .btn-judge {
-  background: var(--accent-[#7e22ce]);
+  background: var(--accent-btn);
   color: #fff;
   font-weight: bold;
   padding: 0.6rem 1.2rem;
@@ -60,7 +57,6 @@ body {
   background: #9333ea;
 }
 
-/* KPI Scorecard Grid */
 .scorecard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -87,7 +83,6 @@ body {
   margin-top: 0.25rem;
 }
 
-/* Exception Table */
 .table-container {
   overflow-x: auto;
   background: var(--bg-dark-surface);
