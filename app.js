@@ -14,46 +14,112 @@ let financialData = {
   bills: 0
 };
 
-csvFile.addEventListener("change", function () {
+csvFile.addEventListener("change", async function () {
   const file = csvFile.files[0];
 
   if (!file) return;
 
-  const reader = new FileReader();
+  try {
+    const text = await readFile(file);
 
-  reader.onload = function (event) {
-    const rows = event.target.result.trim().split("\n");
-
-    financialData = {
-      cash: 0,
-      receivables: 0,
-      bills: 0
-    };
-
-    rows.slice(1).forEach(function (row) {
-      const columns = row.split(",");
-
-      const type = columns[0]?.trim().toLowerCase();
-      const amount = Number(columns[1]?.trim()) || 0;
-
-      if (type === "cash") {
-        financialData.cash += amount;
-      }
-
-      if (type === "receivable") {
-        financialData.receivables += amount;
-      }
-
-      if (type === "bill") {
-        financialData.bills += amount;
-      }
-    });
+    financialData = extractFinancialData(text);
 
     updateDashboard();
-  };
-
-  reader.readAsText(file);
+  } catch (error) {
+    alert("We could not read this file. Please try a PDF, Excel, CSV, or text financial report.");
+    console.error(error);
+  }
 });
+
+async function readFile(file) {
+  const fileName = file.name.toLowerCase();
+
+  if (fileName.endsWith(".pdf")) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let fullText = "";
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+
+      fullText += content.items.map(item => item.str).join(" ") + "\n";
+    }
+
+    return fullText;
+  }
+
+  if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: "array" });
+
+    let fullText = "";
+
+    workbook.SheetNames.forEach(function (sheetName) {
+      const sheet = workbook.Sheets[sheetName];
+      fullText += XLSX.utils.sheet_to_csv(sheet) + "\n";
+    });
+
+    return fullText;
+  }
+
+  return await file.text();
+}
+
+function extractFinancialData(text) {
+  const lowerText = text.toLowerCase();
+
+  const numbers = text.match(/₹?\s?\d[\d,]*(?:\.\d+)?/g) || [];
+
+  const amounts = numbers.map(function (number) {
+    return Number(number.replace(/[₹,\s]/g, "")) || 0;
+  });
+
+  let cash = 0;
+  let receivables = 0;
+  let bills = 0;
+
+  amounts.forEach(function (amount, index) {
+    const nearbyText = lowerText.substring(
+      Math.max(0, index * 30 - 40),
+      index * 30 + 100
+    );
+
+    if (
+      nearbyText.includes("cash") ||
+      nearbyText.includes("bank balance") ||
+      nearbyText.includes("available balance")
+    ) {
+      cash += amount;
+    } else if (
+      nearbyText.includes("receivable") ||
+      nearbyText.includes("money owed") ||
+      nearbyText.includes("amount due to us")
+    ) {
+      receivables += amount;
+    } else if (
+      nearbyText.includes("bill") ||
+      nearbyText.includes("payable") ||
+      nearbyText.includes("expense") ||
+      nearbyText.includes("amount due")
+    ) {
+      bills += amount;
+    }
+  });
+
+  if (cash === 0 && amounts.length > 0) cash = amounts[0];
+  if (receivables === 0 && amounts.length > 1) receivables = amounts[1];
+  if (bills === 0 && amounts.length > 2) {
+    bills = amounts.slice(2).reduce((total, amount) => total + amount, 0);
+  }
+
+  return {
+    cash,
+    receivables,
+    bills
+  };
+}
 
 function formatCurrency(amount) {
   return "₹" + amount.toLocaleString("en-IN");
@@ -73,7 +139,9 @@ function generateActions() {
   actionsList.innerHTML = "";
 
   const availableAfterBills =
-    financialData.cash + financialData.receivables - financialData.bills;
+    financialData.cash +
+    financialData.receivables -
+    financialData.bills;
 
   const actions = [];
 
