@@ -1,6 +1,6 @@
 # RIPPLE
 
-### Know your cash. Know what to do next.
+### KNOW YOUR CASH. NO GUESSWORK.
 
 **AI Finance Controller — Run the books and the cash position.**
 
