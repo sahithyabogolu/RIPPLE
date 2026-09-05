@@ -1,1432 +1,598 @@
-"use strict";
+/**
+ * RIPPLE — Core Engine & UI Logic
+ * Production-ready, client-side financial reconciliation engine.
+ */
 
-/* =========================================================
-   RIPPLE — Finance Control Workspace
-   ========================================================= */
+(function () {
+  'use strict';
 
-const $ = (id) => document.getElementById(id);
-
-const uploadInput = $("csvFile");
-const fileName = $("fileName");
-const statusMessage = $("statusMessage");
-const errorMessage = $("errorMessage");
-
-const welcomeModal = $("welcomeModal");
-const userNameInput = $("userNameInput");
-const saveNameButton = $("saveNameButton");
-const headerGreeting = $("headerGreeting");
-const heroDescription = $("heroDescription");
-
-const privacyModal = $("privacyModal");
-const openPrivacyButton = $("openPrivacyButton");
-const closePrivacyButton = $("closePrivacyButton");
-const saveAnalysesToggle = $("saveAnalysesToggle");
-const clearWorkspaceButton = $("clearWorkspaceButton");
-const privacyFeedback = $("privacyFeedback");
-
-const workspaceSection = $("workspaceSection");
-const workspaceTitle = $("workspaceTitle");
-const historyList = $("historyList");
-const historyCount = $("historyCount");
-const newAnalysisButton = $("newAnalysisButton");
-
-const dashboard = $("dashboard");
-const dashboardTitle = $("dashboardTitle");
-const dashboardSubtitle = $("dashboardSubtitle");
-
-const cashValue = $("cashValue");
-const receivablesValue = $("receivablesValue");
-const billsValue = $("billsValue");
-
-const riskSummary = $("riskSummary");
-const riskDescription = $("riskDescription");
-const riskScoreTag = $("riskScoreTag");
-const riskWarning = $("riskWarning");
-const riskWarningList = $("riskWarningList");
-const riskSuccess = $("riskSuccess");
-
-const dataQuality = $("dataQuality");
-const actionsList = $("actionsList");
-const evidenceList = $("evidenceList");
-
-const saveCurrentAnalysisButton = $("saveCurrentAnalysisButton");
-const deleteCurrentAnalysisButton = $("deleteCurrentAnalysisButton");
-const resetButton = $("resetButton");
-
-const chartContainer = $("chartContainer");
-const chartLegend = $("chartLegend");
-const chartTabs = document.querySelectorAll(".chart-tab");
-
-const collectionRate = $("collectionRate");
-const paymentDelay = $("paymentDelay");
-const collectionRateLabel = $("collectionRateLabel");
-const paymentDelayLabel = $("paymentDelayLabel");
-const simulateButton = $("simulateButton");
-const simulationResult = $("simulationResult");
-
-const sampleButton = $("sampleButton");
-
-const STORAGE_NAME = "ripple_user_name";
-const STORAGE_HISTORY = "ripple_analysis_history";
-const STORAGE_SAVE_SETTING = "ripple_save_setting";
-
-let currentAnalysis = null;
-let currentChart = "bar";
-let currentHistoryId = null;
-
-/* =========================================================
-   General helpers
-   ========================================================= */
-
-function cleanText(value) {
-  return String(value ?? "")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function normaliseHeader(value) {
-  return cleanText(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
-}
-
-function parseNumber(value) {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-
-  const cleaned = String(value ?? "")
-    .replace(/₹/g, "")
-    .replace(/,/g, "")
-    .replace(/%/g, "")
-    .replace(/[^\d.-]/g, "");
-
-  const number = Number(cleaned);
-  return Number.isFinite(number) ? number : 0;
-}
-
-function parseDate(value) {
-  if (!value) return null;
-
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value;
-  }
-
-  const date = new Date(value);
-
-  if (!Number.isNaN(date.getTime())) {
-    return date;
-  }
-
-  return null;
-}
-
-function formatCurrency(value) {
-  const amount = Number(value) || 0;
-
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0
-  }).format(amount);
-}
-
-function formatDate(value) {
-  const date = parseDate(value);
-
-  if (!date) return "Date unavailable";
-
-  return date.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  });
-}
-
-function escapeHTML(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function setStatus(message = "", isError = false) {
-  if (isError) {
-    errorMessage.textContent = message;
-    statusMessage.textContent = "";
-  } else {
-    statusMessage.textContent = message;
-    errorMessage.textContent = "";
-  }
-}
-
-function getColumn(row, aliases) {
-  const keys = Object.keys(row);
-  const match = keys.find((key) =>
-    aliases.some(
-      (alias) => normaliseHeader(key) === normaliseHeader(alias)
-    )
-  );
-
-  return match ? row[match] : null;
-}
-
-function getDateFromRow(row) {
-  return (
-    getColumn(row, [
-      "date",
-      "transaction date",
-      "invoice date",
-      "due date",
-      "payment date"
-    ]) || null
-  );
-}
-
-function getAmountFromRow(row) {
-  return parseNumber(
-    getColumn(row, [
-      "amount",
-      "value",
-      "total",
-      "total amount",
-      "invoice amount",
-      "money in",
-      "money out",
-      "balance",
-      "outstanding"
-    ])
-  );
-}
-
-function getDescriptionFromRow(row) {
-  return cleanText(
-    getColumn(row, [
-      "description",
-      "details",
-      "particulars",
-      "customer",
-      "supplier",
-      "name",
-      "category"
-    ]) || "Financial item"
-  );
-}
-
-function getRowsFromSheet(sheet) {
-  return XLSX.utils.sheet_to_json(sheet, {
-    defval: ""
-  });
-}
-
-/* =========================================================
-   User identity and privacy
-   ========================================================= */
-
-function getUserName() {
-  return localStorage.getItem(STORAGE_NAME) || "";
-}
-
-function saveUserName() {
-  const name = cleanText(userNameInput.value);
-
-  if (!name) {
-    userNameInput.focus();
-    return;
-  }
-
-  localStorage.setItem(STORAGE_NAME, name);
-  welcomeModal.classList.add("hidden");
-  document.body.classList.remove("modal-open");
-
-  updatePersonalisation();
-}
-
-function updatePersonalisation() {
-  const name = getUserName();
-
-  if (name) {
-    headerGreeting.textContent = `Welcome back, ${name}`;
-    heroDescription.textContent =
-      `Your private finance workspace is ready, ${name}. Turn financial data into clear cash-flow insights and practical decisions.`;
-    workspaceTitle.textContent = `${name}'s analysis workspace.`;
-  } else {
-    headerGreeting.textContent = "Finance control workspace";
-  }
-}
-
-function openWelcomeModal() {
-  welcomeModal.classList.remove("hidden");
-  document.body.classList.add("modal-open");
-
-  setTimeout(() => {
-    userNameInput.focus();
-  }, 100);
-}
-
-function openPrivacyModal() {
-  saveAnalysesToggle.checked =
-    localStorage.getItem(STORAGE_SAVE_SETTING) === "true";
-
-  privacyFeedback.textContent = "";
-  privacyModal.classList.remove("hidden");
-  document.body.classList.add("modal-open");
-}
-
-function closePrivacyModal() {
-  privacyModal.classList.add("hidden");
-  document.body.classList.remove("modal-open");
-}
-
-function updateSavePreference() {
-  localStorage.setItem(
-    STORAGE_SAVE_SETTING,
-    String(saveAnalysesToggle.checked)
-  );
-
-  privacyFeedback.textContent = saveAnalysesToggle.checked
-    ? "Analyses will now be saved locally when you choose Save analysis."
-    : "Automatic local saving is turned off.";
-}
-
-function getSavedHistory() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_HISTORY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveHistory(history) {
-  localStorage.setItem(STORAGE_HISTORY, JSON.stringify(history));
-}
-
-function clearWorkspace() {
-  const confirmed = window.confirm(
-    "Clear all saved analyses from this browser?"
-  );
-
-  if (!confirmed) return;
-
-  localStorage.removeItem(STORAGE_HISTORY);
-  renderHistory();
-  privacyFeedback.textContent = "Saved workspace cleared.";
-}
-
-/* =========================================================
-   Workbook processing
-   ========================================================= */
-
-function classifyRows(rows) {
-  const result = {
-    transactions: [],
-    receivables: [],
-    payables: [],
-    forecast: [],
-    other: []
+  // --- STATE MANAGEMENT ---
+  const STATE = {
+    records: [],
+    resolved: [],
+    exceptions: [],
+    currency: 'INR',
+    ninjaMode: false,
+    operatorName: '',
+    visibilityMode: 'private', // 'private' = sessionStorage, 'public' = localStorage
+    simSliders: {
+      collectionDelay: 0,
+      emergencyExpense: 0,
+      vendorDeferral: 0
+    }
   };
 
-  rows.forEach((row) => {
-    const headers = Object.keys(row)
-      .map(normaliseHeader)
-      .join(" ");
-
-    const description = getDescriptionFromRow(row).toLowerCase();
-
-    const outstanding = parseNumber(
-      getColumn(row, ["outstanding", "balance", "amount due"])
-    );
-
-    const received = parseNumber(
-      getColumn(row, ["received", "paid", "collected", "amount received"])
-    );
-
-    const moneyIn = parseNumber(
-      getColumn(row, ["money in", "inflow", "income", "receipts"])
-    );
-
-    const moneyOut = parseNumber(
-      getColumn(row, ["money out", "outflow", "expense", "payments"])
-    );
-
-    const amount = getAmountFromRow(row);
-
-    if (
-      headers.includes("customer") ||
-      headers.includes("receivable") ||
-      headers.includes("invoice") ||
-      headers.includes("amountdue") ||
-      outstanding > 0 ||
-      received > 0
-    ) {
-      result.receivables.push({
-        ...row,
-        amount: outstanding || amount,
-        received,
-        date: getDateFromRow(row),
-        description
-      });
-
-      return;
-    }
-
-    if (
-      headers.includes("supplier") ||
-      headers.includes("payable") ||
-      headers.includes("vendor") ||
-      headers.includes("bill") ||
-      headers.includes("expense")
-    ) {
-      result.payables.push({
-        ...row,
-        amount: amount || outstanding,
-        date: getDateFromRow(row),
-        description
-      });
-
-      return;
-    }
-
-    if (
-      headers.includes("forecast") ||
-      headers.includes("openingcash") ||
-      headers.includes("closingcash") ||
-      headers.includes("expectedcollections")
-    ) {
-      result.forecast.push({
-        ...row,
-        amount,
-        date: getDateFromRow(row),
-        description
-      });
-
-      return;
-    }
-
-    if (moneyIn || moneyOut || amount) {
-      result.transactions.push({
-        ...row,
-        amount,
-        moneyIn,
-        moneyOut,
-        date: getDateFromRow(row),
-        description
-      });
-
-      return;
-    }
-
-    result.other.push(row);
-  });
-
-  return result;
-}
-
-function calculateAnalysis(rows, sourceName, isDemo = false) {
-  const grouped = classifyRows(rows);
-
-  const transactionInflow = grouped.transactions.reduce(
-    (sum, row) => sum + (row.moneyIn || 0),
-    0
-  );
-
-  const transactionOutflow = grouped.transactions.reduce(
-    (sum, row) => sum + (row.moneyOut || 0),
-    0
-  );
-
-  const receivables = grouped.receivables.reduce(
-    (sum, row) => sum + Math.max(row.amount || 0, 0),
-    0
-  );
-
-  const received = grouped.receivables.reduce(
-    (sum, row) => sum + Math.max(row.received || 0, 0),
-    0
-  );
-
-  const payables = grouped.payables.reduce(
-    (sum, row) => sum + Math.max(row.amount || 0, 0),
-    0
-  );
-
-  const forecastCash = grouped.forecast.reduce(
-    (sum, row) => sum + (row.amount || 0),
-    0
-  );
-
-  const totalInflow = transactionInflow + received;
-  const totalOutflow = transactionOutflow + payables;
-
-  const estimatedCash =
-    forecastCash || totalInflow - totalOutflow;
-
-  const collectionRate =
-    receivables > 0
-      ? Math.round((received / receivables) * 100)
-      : 0;
-
-  const overdueReceivables = grouped.receivables.filter((row) => {
-    const date = parseDate(row.date);
-    return date && date < new Date() && row.amount > row.received;
-  });
-
-  const overdueAmount = overdueReceivables.reduce(
-    (sum, row) => sum + Math.max((row.amount || 0) - (row.received || 0), 0),
-    0
-  );
-
-  const essentialPayables = grouped.payables
-    .filter((row) => {
-      const text = row.description.toLowerCase();
-
-      return (
-        text.includes("salary") ||
-        text.includes("rent") ||
-        text.includes("tax") ||
-        text.includes("electric") ||
-        text.includes("utility") ||
-        text.includes("supplier")
-      );
-    })
-    .reduce((sum, row) => sum + row.amount, 0);
-
-  const nonEssentialPayables = Math.max(
-    payables - essentialPayables,
-    0
-  );
-
-  let riskScore = 0;
-
-  if (estimatedCash < 0) riskScore += 45;
-  else if (estimatedCash < payables * 0.5) riskScore += 30;
-  else if (estimatedCash < payables) riskScore += 15;
-
-  if (overdueAmount > receivables * 0.25) riskScore += 30;
-  else if (overdueAmount > 0) riskScore += 15;
-
-  if (payables > receivables) riskScore += 15;
-  if (collectionRate < 50) riskScore += 10;
-
-  riskScore = Math.min(riskScore, 100);
-
-  let riskLevel = "low";
-
-  if (riskScore >= 65) riskLevel = "high";
-  else if (riskScore >= 35) riskLevel = "medium";
-
-  const warnings = [];
-
-  if (estimatedCash < 0) {
-    warnings.push("Estimated cash position is negative.");
-  }
-
-  if (overdueAmount > 0) {
-    warnings.push(
-      `${formatCurrency(overdueAmount)} may be tied up in overdue receivables.`
-    );
-  }
-
-  if (payables > receivables) {
-    warnings.push("Upcoming obligations exceed recorded receivables.");
-  }
-
-  if (collectionRate < 50 && receivables > 0) {
-    warnings.push("Collection performance may need attention.");
-  }
-
-  const actions = [];
-
-  if (overdueAmount > 0) {
-    actions.push(
-      `Prioritise follow-up on overdue receivables worth ${formatCurrency(overdueAmount)}.`
-    );
-  }
-
-  if (nonEssentialPayables > 0) {
-    actions.push(
-      `Review or reschedule non-essential payments worth ${formatCurrency(nonEssentialPayables)}.`
-    );
-  }
-
-  if (collectionRate < 70 && receivables > 0) {
-    actions.push(
-      "Create a short collection plan for the largest outstanding customers."
-    );
-  }
-
-  if (estimatedCash < 0) {
-    actions.push(
-      "Protect essential payments first and review near-term funding needs."
-    );
-  }
-
-  if (!actions.length) {
-    actions.push(
-      "Continue monitoring collections, upcoming bills, and cash movements."
-    );
-  }
-
-  const evidence = [
-    `${grouped.transactions.length} transaction records reviewed.`,
-    `${grouped.receivables.length} receivable records identified.`,
-    `${grouped.payables.length} payable records identified.`
-  ];
-
-  if (grouped.forecast.length) {
-    evidence.push(`${grouped.forecast.length} forecast records included.`);
-  }
-
-  if (isDemo) {
-    evidence.push("This analysis uses fictional demonstration data.");
-  } else {
-    evidence.push("Analysis is based only on the uploaded file.");
-  }
-
-  return {
-    id: crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random()}`,
-    sourceName,
-    createdAt: new Date().toISOString(),
-    isDemo,
-    rows,
-    grouped,
-    metrics: {
-      estimatedCash,
-      receivables,
-      payables,
-      received,
-      totalInflow,
-      totalOutflow,
-      collectionRate,
-      overdueAmount,
-      essentialPayables,
-      nonEssentialPayables,
-      riskScore,
-      riskLevel
-    },
-    warnings,
-    actions,
-    evidence
+  const CURRENCY_SYMBOLS = {
+    INR: '₹',
+    USD: '$',
+    EUR: '€',
+    GBP: '£',
+    AED: 'د.إ '
   };
-}
 
-/* =========================================================
-   Rendering
-   ========================================================= */
+  // --- DOM ELEMENTS ---
+  const DOM = {
+    currencySelect: document.getElementById('currency-select'),
+    ninjaToggleBtn: document.getElementById('ninja-toggle-btn'),
+    ninjaBtnText: document.getElementById('ninja-btn-text'),
+    settingsTriggerBtn: document.getElementById('settings-trigger-btn'),
+    settingsModal: document.getElementById('settings-modal'),
+    closeSettingsBtn: document.getElementById('close-settings-btn'),
+    userNameInput: document.getElementById('user-name-input'),
+    workspaceVisibility: document.getElementById('workspace-visibility'),
+    factoryResetBtn: document.getElementById('factory-reset-btn'),
+    fileInput: document.getElementById('file-input'),
+    dropZone: document.getElementById('drop-zone'),
+    loadDemoBtn: document.getElementById('load-demo-btn'),
+    fileStatusText: document.getElementById('file-status-text'),
+    fileStatusIcon: document.getElementById('file-status-icon'),
+    storageTypeBadge: document.getElementById('storage-type-badge'),
+    
+    // Metrics
+    metricCash: document.getElementById('metric-cash'),
+    metricInflows: document.getElementById('metric-inflows'),
+    metricOutflows: document.getElementById('metric-outflows'),
+    metricRunway: document.getElementById('metric-runway'),
+    metricRunwayStatus: document.getElementById('metric-runway-status'),
+    
+    // Summary
+    statProcessed: document.getElementById('stat-processed'),
+    statResolved: document.getElementById('stat-resolved'),
+    statExceptions: document.getElementById('stat-exceptions'),
+    matchRateBadge: document.getElementById('match-rate-badge'),
+    monthlyBreakdownList: document.getElementById('monthly-breakdown-list'),
+    
+    // Tables
+    exceptionsTbody: document.getElementById('exceptions-tbody'),
+    registerTbody: document.getElementById('register-tbody'),
+    registerSearch: document.getElementById('register-search'),
+    registerFilter: document.getElementById('register-filter'),
 
-function renderAnalysis(analysis) {
-  currentAnalysis = analysis;
-  currentHistoryId = analysis.id;
+    // Simulator
+    sliderCollection: document.getElementById('slider-collection'),
+    sliderEmergency: document.getElementById('slider-emergency'),
+    sliderVendor: document.getElementById('slider-vendor'),
+    valCollection: document.getElementById('val-collection'),
+    valEmergency: document.getElementById('val-emergency'),
+    valVendor: document.getElementById('val-vendor'),
+    simProjectedCash: document.getElementById('sim-projected-cash'),
+    simImpactNote: document.getElementById('sim-impact-note'),
+    resetSimBtn: document.getElementById('reset-sim-btn'),
 
-  workspaceSection.classList.remove("hidden");
-  dashboard.classList.remove("hidden");
+    // Exports
+    exportPdfBtn: document.getElementById('export-pdf-btn'),
+    exportCsvBtn: document.getElementById('export-csv-btn')
+  };
 
-  dashboardTitle.textContent = analysis.isDemo
-    ? "Explore a fictional cash position."
-    : "Your cash position, clearly.";
-
-  dashboardSubtitle.textContent = analysis.isDemo
-    ? "A fictional example showing how RIPPLE turns financial data into decisions."
-    : `Analysis based on ${analysis.sourceName}.`;
-
-  cashValue.textContent = formatCurrency(
-    analysis.metrics.estimatedCash
-  );
-
-  receivablesValue.textContent = formatCurrency(
-    analysis.metrics.receivables
-  );
-
-  billsValue.textContent = formatCurrency(
-    analysis.metrics.payables
-  );
-
-  const riskLevel = analysis.metrics.riskLevel;
-  riskSummary.className = `risk-badge ${riskLevel}`;
-  riskSummary.textContent =
-    `${riskLevel.charAt(0).toUpperCase()}${riskLevel.slice(1)} risk`;
-
-  riskScoreTag.textContent =
-    `Score ${analysis.metrics.riskScore}`;
-
-  riskDescription.textContent =
-    riskLevel === "high"
-      ? "The current data suggests a meaningful liquidity pressure that needs attention."
-      : riskLevel === "medium"
-        ? "The current data suggests some pressure points worth monitoring."
-        : "The current position appears manageable based on the information provided.";
-
-  riskWarningList.innerHTML = analysis.warnings
-    .map((warning) => `<li>${escapeHTML(warning)}</li>`)
-    .join("");
-
-  riskWarning.classList.toggle(
-    "hidden",
-    analysis.warnings.length === 0
-  );
-
-  riskSuccess.classList.toggle(
-    "hidden",
-    analysis.warnings.length > 0
-  );
-
-  dataQuality.textContent = analysis.rows.length
-    ? `${analysis.rows.length} rows reviewed`
-    : "Limited data";
-
-  actionsList.innerHTML = analysis.actions
-    .map((action) => `<li>${escapeHTML(action)}</li>`)
-    .join("");
-
-  evidenceList.innerHTML = analysis.evidence
-    .map((item) => `<li>${escapeHTML(item)}</li>`)
-    .join("");
-
-  collectionRate.value = 0;
-  paymentDelay.value = 0;
-  collectionRateLabel.textContent = "0%";
-  paymentDelayLabel.textContent = "0 days";
-
-  renderChart(currentChart);
-  updateSimulation();
-
-  dashboard.scrollIntoView({
-    behavior: "smooth",
-    block: "start"
-  });
-}
-
-function renderHistory() {
-  const history = getSavedHistory();
-
-  historyCount.textContent =
-    `${history.length} saved`;
-
-  if (!history.length) {
-    historyList.innerHTML = `
-      <div class="empty-history">
-        <span>◌</span>
-        <p>Your saved analyses will appear here.</p>
-      </div>
-    `;
-    return;
+  // --- INITIALIZATION ---
+  function init() {
+    loadSettings();
+    setupEventListeners();
+    renderCurrency();
   }
 
-  historyList.innerHTML = history
-    .map(
-      (item) => `
-        <button
-          type="button"
-          class="history-item ${
-            item.id === currentHistoryId ? "active" : ""
-          }"
-          data-history-id="${escapeHTML(item.id)}"
-        >
-          <span class="history-item-name">
-            ${escapeHTML(item.sourceName)}
-          </span>
+  // --- STORAGE MANAGEMENT ---
+  function getStorage() {
+    return STATE.visibilityMode === 'public' ? localStorage : sessionStorage;
+  }
 
-          <span class="history-item-meta">
-            ${formatDate(item.createdAt)}
-          </span>
-        </button>
-      `
-    )
-    .join("");
+  function loadSettings() {
+    const savedName = localStorage.getItem('ripple_operator_name') || sessionStorage.getItem('ripple_operator_name');
+    const savedVis = localStorage.getItem('ripple_visibility') || 'private';
+    
+    STATE.operatorName = savedName || '';
+    STATE.visibilityMode = savedVis;
+    
+    DOM.userNameInput.value = STATE.operatorName;
+    DOM.workspaceVisibility.value = STATE.visibilityMode;
+    updateStorageBadge();
+  }
 
-  document.querySelectorAll(".history-item").forEach((button) => {
-    button.addEventListener("click", () => {
-      const id = button.dataset.historyId;
-      const selected = history.find((item) => item.id === id);
+  function saveSettings() {
+    STATE.operatorName = DOM.userNameInput.value.trim();
+    STATE.visibilityMode = DOM.workspaceVisibility.value;
 
-      if (selected) {
-        renderAnalysis(selected);
-        renderHistory();
+    localStorage.removeItem('ripple_operator_name');
+    sessionStorage.removeItem('ripple_operator_name');
+    
+    getStorage().setItem('ripple_operator_name', STATE.operatorName);
+    localStorage.setItem('ripple_visibility', STATE.visibilityMode);
+
+    updateStorageBadge();
+  }
+
+  function updateStorageBadge() {
+    if (STATE.visibilityMode === 'private') {
+      DOM.storageTypeBadge.textContent = 'Private Workspace (Session)';
+      DOM.storageTypeBadge.style.color = 'var(--accent-cyan)';
+    } else {
+      DOM.storageTypeBadge.textContent = 'Local Workspace (Persistent)';
+      DOM.storageTypeBadge.style.color = 'var(--accent-amber)';
+    }
+  }
+
+  function factoryReset() {
+    localStorage.clear();
+    sessionStorage.clear();
+    STATE.records = [];
+    STATE.resolved = [];
+    STATE.exceptions = [];
+    STATE.operatorName = '';
+    STATE.visibilityMode = 'private';
+    DOM.userNameInput.value = '';
+    DOM.workspaceVisibility.value = 'private';
+    DOM.fileStatusIcon.textContent = '◌';
+    DOM.fileStatusText.textContent = 'No file selected';
+    resetSimulator();
+    renderAll();
+    DOM.settingsModal.classList.add('hidden');
+  }
+
+  // --- SYNTHETIC DATA GENERATOR ---
+  function generateSyntheticDataset() {
+    const categories = ['Client Payment', 'Vendor Invoice', 'Payroll', 'Software SaaS', 'Office Logistics', 'Tax Reserve'];
+    const records = [];
+    const baseDate = new Date();
+    
+    for (let i = 1; i <= 55; i++) {
+      const isOutflow = i % 3 === 0;
+      const type = isOutflow ? 'outflow' : 'inflow';
+      const category = categories[Math.floor(Math.random() * categories.length)];
+      const amount = Math.floor(Math.random() * 4500) + 150;
+      
+      const dateObj = new Date(baseDate);
+      dateObj.setDate(baseDate.getDate() - (i % 60));
+      const dateStr = dateObj.toISOString().split('T')[0];
+
+      records.push({
+        row: i,
+        date: dateStr,
+        reference: `REF-${1000 + i}`,
+        category: category,
+        type: type,
+        amount: amount,
+        status: 'UNPROCESSED'
+      });
+    }
+
+    // Seed specific rule violations (Dirty Records)
+    records[4].reference = records[2].reference; // Duplicate Reference
+    records[11].amount = -500; // Mismatched / Negative Amount
+    records[18].reference = ''; // Missing Reference
+    records[25].date = '2035-12-31'; // Out of Range Date
+    records[32].category = ''; // Unclassified Category
+    records[41].reference = records[10].reference; // Another Duplicate
+
+    return records;
+  }
+
+  // --- DETERMINISTIC RECONCILIATION ENGINE ---
+  function reconcileRecords(rawRecords) {
+    const resolved = [];
+    const exceptions = [];
+    const seenRefs = new Map();
+    const currentDate = new Date();
+
+    rawRecords.forEach((record) => {
+      const rec = { ...record };
+      const issues = [];
+
+      // Rule 1: Missing Reference Check
+      if (!rec.reference || rec.reference.trim() === '') {
+        issues.push('Missing reference ID');
+      }
+
+      // Rule 2: Amount Integrity Check
+      if (typeof rec.amount !== 'number' || isNaN(rec.amount) || rec.amount <= 0) {
+        issues.push('Invalid or negative amount vs ledger rules');
+      }
+
+      // Rule 3: Unclassified Category Check
+      if (!rec.category || rec.category.trim() === '') {
+        issues.push('Unclassified category field');
+      }
+
+      // Rule 4: Date Range Validation
+      if (rec.date) {
+        const recDate = new Date(rec.date);
+        if (isNaN(recDate.getTime()) || recDate > currentDate) {
+          issues.push('Out-of-range or future transaction date');
+        }
+      } else {
+        issues.push('Missing transaction date');
+      }
+
+      // Rule 5: Duplicate Reference Check
+      if (rec.reference && rec.reference.trim() !== '') {
+        if (seenRefs.has(rec.reference)) {
+          issues.push(`Duplicate reference ID (conflicts with Row ${seenRefs.get(rec.reference)})`);
+        } else {
+          seenRefs.set(rec.reference, rec.row);
+        }
+      }
+
+      // Final Verdict Logic (Deterministic)
+      if (issues.length === 0) {
+        rec.status = 'RESOLVED';
+        resolved.push(rec);
+      } else {
+        rec.status = 'EXCEPTION';
+        rec.issueReason = issues.join('; ');
+        exceptions.push(rec);
       }
     });
-  });
-}
 
-function saveCurrentAnalysis() {
-  if (!currentAnalysis) return;
-
-  const history = getSavedHistory();
-  const existingIndex = history.findIndex(
-    (item) => item.id === currentAnalysis.id
-  );
-
-  if (existingIndex >= 0) {
-    history[existingIndex] = currentAnalysis;
-  } else {
-    history.unshift(currentAnalysis);
+    return { resolved, exceptions };
   }
 
-  saveHistory(history);
-  renderHistory();
+  // --- PARSER (CSV / Text Ingestion) ---
+  function parseCSV(text) {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length < 2) return [];
 
-  setStatus("Analysis saved locally in your workspace.");
-}
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const records = [];
 
-function deleteCurrentAnalysis() {
-  if (!currentAnalysis) return;
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(c => c.trim());
+      if (cols.length < headers.length) continue;
 
-  const confirmed = window.confirm(
-    "Delete this saved analysis from your workspace?"
-  );
-
-  if (!confirmed) return;
-
-  const history = getSavedHistory().filter(
-    (item) => item.id !== currentAnalysis.id
-  );
-
-  saveHistory(history);
-  currentHistoryId = null;
-  renderHistory();
-
-  setStatus("Saved analysis deleted.");
-}
-
-function resetWorkspace() {
-  currentAnalysis = null;
-  currentHistoryId = null;
-
-  dashboard.classList.add("hidden");
-  workspaceSection.classList.add("hidden");
-
-  uploadInput.value = "";
-  fileName.textContent = "No file selected";
-  setStatus("");
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
-}
-
-/* =========================================================
-   Charts
-   ========================================================= */
-
-function getChartData() {
-  if (!currentAnalysis) return [];
-
-  const metrics = currentAnalysis.metrics;
-
-  return [
-    {
-      label: "Cash",
-      value: Math.max(metrics.estimatedCash, 0)
-    },
-    {
-      label: "Receivables",
-      value: metrics.receivables
-    },
-    {
-      label: "Bills",
-      value: metrics.payables
+      const rowObj = {
+        row: i,
+        date: cols[0] || '',
+        reference: cols[1] || '',
+        category: cols[2] || '',
+        type: (cols[3] || 'inflow').toLowerCase().includes('out') ? 'outflow' : 'inflow',
+        amount: parseFloat(cols[4]) || 0,
+        status: 'UNPROCESSED'
+      };
+      records.push(rowObj);
     }
-  ];
-}
-
-function renderChart(type = "bar") {
-  currentChart = type;
-
-  chartTabs.forEach((tab) => {
-    tab.classList.toggle(
-      "active",
-      tab.dataset.chart === type
-    );
-  });
-
-  const data = getChartData();
-
-  if (!data.length) {
-    chartContainer.innerHTML = `
-      <div class="chart-empty">
-        Your chart will appear after an analysis is loaded.
-      </div>
-    `;
-    chartLegend.innerHTML = "";
-    return;
+    return records;
   }
 
-  if (type === "pie") {
-    renderPieChart(data);
-  } else if (type === "line") {
-    renderLineChart(data);
-  } else {
-    renderBarChart(data);
+  // --- FORMATTING HELPERS ---
+  function formatMoney(num) {
+    const sym = CURRENCY_SYMBOLS[STATE.currency] || '₹';
+    const formatted = Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `${num < 0 ? '-' : ''}${sym}${formatted}`;
   }
-}
 
-function renderBarChart(data) {
-  const width = 700;
-  const height = 280;
-  const padding = 45;
-  const max = Math.max(...data.map((item) => item.value), 1);
-  const chartHeight = height - padding * 2;
-  const barWidth = 100;
-  const gap = 65;
+  // --- RENDERING FUNCTIONS ---
+  function renderAll() {
+    renderMetrics();
+    renderSummary();
+    renderExceptionsTable();
+    renderRegisterTable();
+    renderSimulator();
+  }
 
-  const bars = data
-    .map((item, index) => {
-      const barHeight = (item.value / max) * chartHeight;
-      const x = padding + index * (barWidth + gap);
-      const y = height - padding - barHeight;
+  function renderCurrency() {
+    DOM.currencySelect.value = STATE.currency;
+    renderAll();
+  }
 
-      return `
-        <rect
-          class="chart-bar"
-          x="${x}"
-          y="${y}"
-          width="${barWidth}"
-          height="${barHeight}"
-          rx="8"
-        ></rect>
+  function renderMetrics() {
+    const totalInflows = STATE.resolved
+      .filter(r => r.type === 'inflow')
+      .reduce((sum, r) => sum + r.amount, 0);
 
-        <text
-          class="chart-value"
-          x="${x + barWidth / 2}"
-          y="${Math.max(y - 10, 15)}"
-          text-anchor="middle"
-        >
-          ${escapeHTML(formatCurrency(item.value))}
-        </text>
+    const totalOutflows = STATE.resolved
+      .filter(r => r.type === 'outflow')
+      .reduce((sum, r) => sum + r.amount, 0);
 
-        <text
-          class="chart-label"
-          x="${x + barWidth / 2}"
-          y="${height - 15}"
-          text-anchor="middle"
-        >
-          ${escapeHTML(item.label)}
-        </text>
-      `;
-    })
-    .join("");
+    const netCash = totalInflows - totalOutflows;
 
-  chartContainer.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img">
-      <line
-        class="chart-axis"
-        x1="${padding}"
-        y1="${height - padding}"
-        x2="${width - padding}"
-        y2="${height - padding}"
-      ></line>
-      ${bars}
-    </svg>
-  `;
+    DOM.metricInflows.textContent = formatMoney(totalInflows);
+    DOM.metricOutflows.textContent = formatMoney(totalOutflows);
+    DOM.metricCash.textContent = formatMoney(netCash);
 
-  renderLegend(data);
-}
-
-function renderLineChart(data) {
-  const width = 700;
-  const height = 280;
-  const padding = 45;
-  const max = Math.max(...data.map((item) => item.value), 1);
-  const chartWidth = width - padding * 2;
-  const chartHeight = height - padding * 2;
-
-  const points = data.map((item, index) => {
-    const x = padding + (index * chartWidth) / (data.length - 1);
-    const y =
-      height -
-      padding -
-      (item.value / max) * chartHeight;
-
-    return { ...item, x, y };
-  });
-
-  const pointString = points
-    .map((point) => `${point.x},${point.y}`)
-    .join(" ");
-
-  const pointMarkup = points
-    .map(
-      (point) => `
-        <circle
-          class="chart-point"
-          cx="${point.x}"
-          cy="${point.y}"
-          r="5"
-        ></circle>
-
-        <text
-          class="chart-value"
-          x="${point.x}"
-          y="${point.y - 13}"
-          text-anchor="middle"
-        >
-          ${escapeHTML(formatCurrency(point.value))}
-        </text>
-
-        <text
-          class="chart-label"
-          x="${point.x}"
-          y="${height - 15}"
-          text-anchor="middle"
-        >
-          ${escapeHTML(point.label)}
-        </text>
-      `
-    )
-    .join("");
-
-  chartContainer.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img">
-      <line
-        class="chart-axis"
-        x1="${padding}"
-        y1="${height - padding}"
-        x2="${width - padding}"
-        y2="${height - padding}"
-      ></line>
-
-      <polyline
-        class="chart-line"
-        points="${pointString}"
-      ></polyline>
-
-      ${pointMarkup}
-    </svg>
-  `;
-
-  renderLegend(data);
-}
-
-function renderPieChart(data) {
-  const total = data.reduce((sum, item) => sum + item.value, 0) || 1;
-  const center = 140;
-  const radius = 90;
-
-  let currentAngle = -Math.PI / 2;
-
-  const segments = data
-    .map((item, index) => {
-      const angle = (item.value / total) * Math.PI * 2;
-      const endAngle = currentAngle + angle;
-
-      const x1 = center + radius * Math.cos(currentAngle);
-      const y1 = center + radius * Math.sin(currentAngle);
-      const x2 = center + radius * Math.cos(endAngle);
-      const y2 = center + radius * Math.sin(endAngle);
-
-      const largeArc = angle > Math.PI ? 1 : 0;
-
-      const path = `
-        M ${center} ${center}
-        L ${x1} ${y1}
-        A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}
-        Z
-      `;
-
-      currentAngle = endAngle;
-
-      return `
-        <path
-          class="chart-pie-segment"
-          d="${path}"
-          fill="var(--${index === 0 ? "purple" : index === 1 ? "purple-light" : "green"})"
-        ></path>
-      `;
-    })
-    .join("");
-
-  chartContainer.innerHTML = `
-    <svg viewBox="0 0 700 280" role="img">
-      <g transform="translate(210 0)">
-        ${segments}
-
-        <circle
-          cx="${center}"
-          cy="${center}"
-          r="42"
-          fill="var(--surface)"
-        ></circle>
-
-        <text
-          class="chart-label"
-          x="${center}"
-          y="${center - 4}"
-          text-anchor="middle"
-        >
-          Total
-        </text>
-
-        <text
-          class="chart-value"
-          x="${center}"
-          y="${center + 15}"
-          text-anchor="middle"
-        >
-          ${escapeHTML(formatCurrency(total))}
-        </text>
-      </g>
-    </svg>
-  `;
-
-  renderLegend(data);
-}
-
-function renderLegend(data) {
-  chartLegend.innerHTML = data
-    .map(
-      (item, index) => `
-        <div class="legend-item">
-          <span
-            class="legend-dot"
-            style="background: ${
-              index === 0
-                ? "var(--purple)"
-                : index === 1
-                  ? "var(--purple-light)"
-                  : "var(--green)"
-            }"
-          ></span>
-          <span>${escapeHTML(item.label)}</span>
-        </div>
-      `
-    )
-    .join("");
-}
-
-/* =========================================================
-   Live scenario simulator
-   ========================================================= */
-
-function updateSimulation() {
-  if (!currentAnalysis) return;
-
-  const collectionImprovement = Number(collectionRate.value);
-  const delayDays = Number(paymentDelay.value);
-
-  collectionRateLabel.textContent =
-    `${collectionImprovement}%`;
-
-  paymentDelayLabel.textContent =
-    `${delayDays} day${delayDays === 1 ? "" : "s"}`;
-
-  const metrics = currentAnalysis.metrics;
-
-  const additionalCollections =
-    metrics.receivables * (collectionImprovement / 100);
-
-  const delayedPayments =
-    metrics.nonEssentialPayables *
-    Math.min(delayDays / 30, 1);
-
-  const projectedCash =
-    metrics.estimatedCash +
-    additionalCollections +
-    delayedPayments;
-
-  const remainingReceivables = Math.max(
-    metrics.receivables -
-      metrics.received -
-      additionalCollections,
-    0
-  );
-
-  const resultClass =
-    projectedCash >= metrics.estimatedCash
-      ? "is-positive"
-      : "is-warning";
-
-  simulationResult.className =
-    `simulation-result ${resultClass}`;
-
-  simulationResult.innerHTML = `
-    With a <strong>${collectionImprovement}% collection improvement</strong>
-    and a <strong>${delayDays}-day payment delay</strong>:
-
-    <br /><br />
-
-    Projected cash position:
-    <strong>${escapeHTML(formatCurrency(projectedCash))}</strong>
-
-    <br />
-
-    Additional collections:
-    <strong>${escapeHTML(formatCurrency(additionalCollections))}</strong>
-
-    <br />
-
-    Payments deferred:
-    <strong>${escapeHTML(formatCurrency(delayedPayments))}</strong>
-
-    <br />
-
-    Remaining receivables:
-    <strong>${escapeHTML(formatCurrency(remainingReceivables))}</strong>
-  `;
-}
-
-function runSimulation() {
-  updateSimulation();
-}
-
-/* =========================================================
-   Fictional demo data
-   ========================================================= */
-
-function createSampleRows() {
-  return [
-    {
-      Date: "2026-09-01",
-      Customer: "Urban Nest Retail",
-      Amount: 145000,
-      Received: 45000,
-      Outstanding: 100000
-    },
-    {
-      Date: "2026-08-20",
-      Customer: "The Home Story",
-      Amount: 92000,
-      Received: 20000,
-      Outstanding: 72000
-    },
-    {
-      Date: "2026-08-15",
-      Customer: "Casa Bella Interiors",
-      Amount: 68000,
-      Received: 68000,
-      Outstanding: 0
-    },
-    {
-      Date: "2026-09-05",
-      Supplier: "Jaipur Blue Pottery Works",
-      Amount: 54000
-    },
-    {
-      Date: "2026-09-07",
-      Supplier: "BESCOM",
-      Amount: 18000
-    },
-    {
-      Date: "2026-09-10",
-      Supplier: "Office and operations",
-      Amount: 27000
-    },
-    {
-      Date: "2026-09-02",
-      Description: "Customer collections",
-      MoneyIn: 68000,
-      MoneyOut: 0
-    },
-    {
-      Date: "2026-09-03",
-      Description: "Operating expenses",
-      MoneyIn: 0,
-      MoneyOut: 22000
-    },
-    {
-      Date: "2026-09-04",
-      Description: "Opening cash balance",
-      MoneyIn: 0,
-      MoneyOut: 0,
-      Amount: 185000
+    // Runway calculation (30-day window based on clean resolved outflows)
+    const dailyBurn = totalOutflows / 30;
+    if (dailyBurn > 0 && netCash > 0) {
+      const days = Math.floor(netCash / dailyBurn);
+      DOM.metricRunway.textContent = `${days} Days`;
+      if (days < 15) {
+        DOM.metricRunwayStatus.textContent = 'Status: Critical';
+        DOM.metricRunwayStatus.style.color = 'var(--accent-red)';
+      } else if (days < 30) {
+        DOM.metricRunwayStatus.textContent = 'Status: Warning';
+        DOM.metricRunwayStatus.style.color = 'var(--accent-amber)';
+      } else {
+        DOM.metricRunwayStatus.textContent = 'Status: Healthy';
+        DOM.metricRunwayStatus.style.color = 'var(--accent-green)';
+      }
+    } else {
+      DOM.metricRunway.textContent = netCash <= 0 ? '0 Days' : '∞ Days';
+      DOM.metricRunwayStatus.textContent = netCash <= 0 ? 'Status: Critical Insolvency' : 'Status: Zero Outflows';
+      DOM.metricRunwayStatus.style.color = netCash <= 0 ? 'var(--accent-red)' : 'var(--text-muted)';
     }
-  ];
-}
-
-function loadSampleData() {
-  const rows = createSampleRows();
-
-  fileName.textContent = "Fictional RIPPLE demo workspace";
-  setStatus("Fictional demonstration data loaded.");
-
-  const analysis = calculateAnalysis(
-    rows,
-    "Fictional RIPPLE demo workspace",
-    true
-  );
-
-  renderAnalysis(analysis);
-}
-
-/* =========================================================
-   File upload
-   ========================================================= */
-
-async function processFile(file) {
-  if (!file) return;
-
-  if (!window.XLSX) {
-    setStatus(
-      "The spreadsheet reader is still loading. Please try again.",
-      true
-    );
-    return;
   }
 
-  const validExtensions = [".xlsx", ".xls", ".csv"];
-  const extension = file.name
-    .toLowerCase()
-    .slice(file.name.lastIndexOf("."));
+  function renderSummary() {
+    const total = STATE.records.length;
+    const resolvedCount = STATE.resolved.length;
+    const exceptionCount = STATE.exceptions.length;
+    const matchRate = total > 0 ? Math.round((resolvedCount / total) * 100) : 0;
 
-  if (!validExtensions.includes(extension)) {
-    setStatus(
-      "Please upload an Excel or CSV file.",
-      true
-    );
-    return;
-  }
+    DOM.statProcessed.textContent = total;
+    DOM.statResolved.textContent = resolvedCount;
+    DOM.statExceptions.textContent = exceptionCount;
+    DOM.matchRateBadge.textContent = `${matchRate}% Matched`;
 
-  try {
-    setStatus("Reading your financial file...");
-    fileName.textContent = file.name;
-
-    const buffer = await file.arrayBuffer();
-
-    const workbook = XLSX.read(buffer, {
-      type: "array",
-      cellDates: true
+    // Monthly breakdown
+    const monthlyMap = {};
+    STATE.resolved.forEach(r => {
+      const month = r.date ? r.date.substring(0, 7) : 'Unknown';
+      if (!monthlyMap[month]) monthlyMap[month] = { inflow: 0, outflow: 0 };
+      if (r.type === 'inflow') monthlyMap[month].inflow += r.amount;
+      else monthlyMap[month].outflow += r.amount;
     });
 
-    const allRows = [];
-
-    workbook.SheetNames.forEach((sheetName) => {
-      const sheet = workbook.Sheets[sheetName];
-      const rows = getRowsFromSheet(sheet);
-
-      rows.forEach((row) => {
-        allRows.push(row);
-      });
-    });
-
-    if (!allRows.length) {
-      throw new Error("No readable rows were found in this file.");
+    DOM.monthlyBreakdownList.innerHTML = '';
+    const months = Object.keys(monthlyMap).sort().reverse();
+    
+    if (months.length === 0) {
+      DOM.monthlyBreakdownList.innerHTML = '<p class="placeholder-text">Load data to view breakdown.</p>';
+      return;
     }
 
-    const analysis = calculateAnalysis(
-      allRows,
-      file.name,
-      false
-    );
-
-    setStatus(
-      `Analysis complete. ${allRows.length} rows reviewed.`
-    );
-
-    renderAnalysis(analysis);
-  } catch (error) {
-    console.error(error);
-
-    setStatus(
-      error.message ||
-        "Something went wrong while reading the file.",
-      true
-    );
+    months.forEach(m => {
+      const row = document.createElement('div');
+      row.className = 'monthly-row';
+      const net = monthlyMap[m].inflow - monthlyMap[m].outflow;
+      row.innerHTML = `
+        <span>${m}</span>
+        <span>In: ${formatMoney(monthlyMap[m].inflow)} | Out: ${formatMoney(monthlyMap[m].outflow)}</span>
+        <strong style="color: ${net >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">${formatMoney(net)}</strong>
+      `;
+      DOM.monthlyBreakdownList.appendChild(row);
+    });
   }
-}
 
-/* =========================================================
-   Event listeners
-   ========================================================= */
+  function renderExceptionsTable() {
+    DOM.exceptionsTbody.innerHTML = '';
+    if (STATE.exceptions.length === 0) {
+      DOM.exceptionsTbody.innerHTML = '<tr><td colspan="5" class="table-placeholder">No reconciliation exceptions detected. All records resolved cleanly.</td></tr>';
+      return;
+    }
 
-saveNameButton.addEventListener("click", saveUserName);
-
-userNameInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    saveUserName();
+    STATE.exceptions.forEach(rec => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${rec.row}</td>
+        <td>${rec.reference || '<em>EMPTY</em>'}</td>
+        <td class="ninja-target">${formatMoney(rec.amount || 0)}</td>
+        <td style="color: var(--accent-red); font-weight: 600;">${rec.issueReason}</td>
+        <td><span class="pill-status exception">Rule Violation</span></td>
+      `;
+      DOM.exceptionsTbody.appendChild(tr);
+    });
   }
-});
 
-openPrivacyButton.addEventListener("click", openPrivacyModal);
+  function renderRegisterTable() {
+    DOM.registerTbody.innerHTML = '';
+    const searchTerm = DOM.registerSearch.value.toLowerCase().trim();
+    const filterType = DOM.registerFilter.value;
 
-closePrivacyButton.addEventListener("click", closePrivacyModal);
+    const filtered = STATE.records.filter(r => {
+      const matchesSearch = (r.reference && r.reference.toLowerCase().includes(searchTerm)) ||
+                            (r.category && r.category.toLowerCase().includes(searchTerm));
+      
+      if (!matchesSearch) return false;
 
-privacyModal.addEventListener("click", (event) => {
-  if (event.target === privacyModal) {
-    closePrivacyModal();
+      if (filterType === 'RESOLVED') return r.status === 'RESOLVED';
+      if (filterType === 'EXCEPTION') return r.status === 'EXCEPTION';
+      if (filterType === 'inflow') return r.type === 'inflow';
+      if (filterType === 'outflow') return r.type === 'outflow';
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      DOM.registerTbody.innerHTML = '<tr><td colspan="7" class="table-placeholder">No matching records found.</td></tr>';
+      return;
+    }
+
+    filtered.forEach(rec => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${rec.row}</td>
+        <td>${rec.date || '-'}</td>
+        <td>${rec.reference || '-'}</td>
+        <td>${rec.category || '-'}</td>
+        <td style="color: ${rec.type === 'inflow' ? 'var(--accent-green)' : 'var(--accent-amber)'}">${rec.type.toUpperCase()}</td>
+        <td class="ninja-target">${formatMoney(rec.amount || 0)}</td>
+        <td><span class="pill-status ${rec.status.toLowerCase()}">${rec.status}</span></td>
+      `;
+      DOM.registerTbody.appendChild(tr);
+    });
   }
-});
 
-saveAnalysesToggle.addEventListener(
-  "change",
-  updateSavePreference
-);
+  function renderSimulator() {
+    const delayDays = parseInt(DOM.sliderCollection.value, 10);
+    const emergencyPct = parseInt(DOM.sliderEmergency.value, 10);
+    const deferralDays = parseInt(DOM.sliderVendor.value, 10);
 
-clearWorkspaceButton.addEventListener(
-  "click",
-  clearWorkspace
-);
+    DOM.valCollection.textContent = `${delayDays} Days`;
+    DOM.valEmergency.textContent = `${emergencyPct}%`;
+    DOM.valVendor.textContent = `${deferralDays} Days`;
 
-uploadInput.addEventListener("change", (event) => {
-  processFile(event.target.files[0]);
-});
+    const cleanInflows = STATE.resolved.filter(r => r.type === 'inflow').reduce((sum, r) => sum + r.amount, 0);
+    const cleanOutflows = STATE.resolved.filter(r => r.type === 'outflow').reduce((sum, r) => sum + r.amount, 0);
 
-sampleButton.addEventListener("click", loadSampleData);
+    // 7-day baseline (pro-rated from batch)
+    let projectedInflow = (cleanInflows / 30) * 7;
+    let projectedOutflow = (cleanOutflows / 30) * 7;
 
-saveCurrentAnalysisButton.addEventListener(
-  "click",
-  saveCurrentAnalysis
-);
+    // Apply slider dynamics
+    if (delayDays > 0) {
+      projectedInflow *= Math.max(0, (1 - (delayDays / 14)));
+    }
 
-deleteCurrentAnalysisButton.addEventListener(
-  "click",
-  deleteCurrentAnalysis
-);
+    if (emergencyPct > 0) {
+      projectedOutflow *= (1 + (emergencyPct / 100));
+    }
 
-resetButton.addEventListener(
-  "click",
-  resetWorkspace
-);
+    if (deferralDays > 0) {
+      projectedOutflow *= Math.max(0.1, (1 - (deferralDays / 14)));
+    }
 
-newAnalysisButton.addEventListener(
-  "click",
-  resetWorkspace
-);
+    const projectedNet = projectedInflow - projectedOutflow;
+    DOM.simProjectedCash.textContent = formatMoney(projectedNet);
 
-simulateButton.addEventListener(
-  "click",
-  runSimulation
-);
-
-collectionRate.addEventListener(
-  "input",
-  updateSimulation
-);
-
-paymentDelay.addEventListener(
-  "input",
-  updateSimulation
-);
-
-chartTabs.forEach((tab) => {
-  tab.addEventListener("click", () => {
-    renderChart(tab.dataset.chart);
-  });
-});
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    closePrivacyModal();
+    if (projectedNet < 0) {
+      DOM.simImpactNote.textContent = 'Warning: Projected 7-day deficit under simulated pressure.';
+      DOM.simImpactNote.style.color = 'var(--accent-red)';
+    } else {
+      DOM.simImpactNote.textContent = 'Liquidity stable under current simulation parameters.';
+      DOM.simImpactNote.style.color = 'var(--accent-green)';
+    }
   }
-});
 
-/* =========================================================
-   Initialisation
-   ========================================================= */
-
-function initialise() {
-  updatePersonalisation();
-  renderHistory();
-
-  const savedPreference =
-    localStorage.getItem(STORAGE_SAVE_SETTING);
-
-  saveAnalysesToggle.checked =
-    savedPreference === "true";
-
-  if (!getUserName()) {
-    openWelcomeModal();
+  function resetSimulator() {
+    DOM.sliderCollection.value = 0;
+    DOM.sliderEmergency.value = 0;
+    DOM.sliderVendor.value = 0;
+    renderSimulator();
   }
-}
 
-initialise();
+  // --- EVENT LISTENERS ---
+  function setupEventListeners() {
+    // Currency Selector
+    DOM.currencySelect.addEventListener('change', (e) => {
+      STATE.currency = e.target.value;
+      renderCurrency();
+    });
+
+    // Ninja Mode Toggle
+    DOM.ninjaToggleBtn.addEventListener('click', toggleNinjaMode);
+    window.addEventListener('keydown', (e) => {
+      if ((e.key === 'n' || e.key === 'N') && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        toggleNinjaMode();
+      }
+    });
+
+    function toggleNinjaMode() {
+      STATE.ninjaMode = !STATE.ninjaMode;
+      document.body.classList.toggle('ninja-mode', STATE.ninjaMode);
+      DOM.ninjaBtnText.textContent = `Ninja Mode (${STATE.ninjaMode ? 'On' : 'Off'})`;
+    }
+
+    // Modal & Settings
+    DOM.settingsTriggerBtn.addEventListener('click', () => DOM.settingsModal.classList.remove('hidden'));
+    DOM.closeSettingsBtn.addEventListener('click', () => DOM.settingsModal.classList.add('hidden'));
+    DOM.userNameInput.addEventListener('input', saveSettings);
+    DOM.workspaceVisibility.addEventListener('change', saveSettings);
+    DOM.factoryResetBtn.addEventListener('click', factoryReset);
+
+    // Boot Demo Data
+    DOM.loadDemoBtn.addEventListener('click', () => {
+      const raw = generateSyntheticDataset();
+      processDataset(raw, 'Synthetic Demo Dataset (55 Records)');
+    });
+
+    // File Upload Handlers
+    DOM.dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      DOM.dropZone.classList.add('dragover');
+    });
+
+    DOM.dropZone.addEventListener('dragleave', () => DOM.dropZone.classList.remove('dragover'));
+
+    DOM.dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      DOM.dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        handleFileSelect(e.dataTransfer.files[0]);
+      }
+    });
+
+    DOM.fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleFileSelect(e.target.files[0]);
+      }
+    });
+
+    function handleFileSelect(file) {
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        const text = event.target.result;
+        const parsed = parseCSV(text);
+        processDataset(parsed, file.name);
+      };
+      reader.readAsText(file);
+    }
+
+    function processDataset(records, sourceName) {
+      STATE.records = records;
+      const { resolved, exceptions } = reconcileRecords(records);
+      STATE.resolved = resolved;
+      STATE.exceptions = exceptions;
+
+      DOM.fileStatusIcon.textContent = '✓';
+      DOM.fileStatusText.textContent = `Loaded: ${sourceName}`;
+      renderAll();
+    }
+
+    // Register Filtering
+    DOM.registerSearch.addEventListener('input', renderRegisterTable);
+    DOM.registerFilter.addEventListener('change', renderRegisterTable);
+
+    // Simulator Sliders
+    DOM.sliderCollection.addEventListener('input', renderSimulator);
+    DOM.sliderEmergency.addEventListener('input', renderSimulator);
+    DOM.sliderVendor.addEventListener('input', renderSimulator);
+    DOM.resetSimBtn.addEventListener('click', resetSimulator);
+
+    // Exports
+    DOM.exportPdfBtn.addEventListener('click', () => window.print());
+    DOM.exportCsvBtn.addEventListener('click', exportCleanCSV);
+  }
+
+  function exportCleanCSV() {
+    if (STATE.resolved.length === 0) {
+      alert('No clean resolved records to export.');
+      return;
+    }
+
+    const headers = ['Row', 'Date', 'Reference', 'Category', 'Type', 'Amount', 'Status'];
+    const rows = STATE.resolved.map(r => [
+      r.row, r.date, `"${r.reference}"`, `"${r.category}"`, r.type, r.amount, r.status
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(','), ...rows.map(e => e.join(','))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `RIPPLE_Clean_Ledger_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Run on DOM ready
+  document.addEventListener('DOMContentLoaded', init);
+})();
