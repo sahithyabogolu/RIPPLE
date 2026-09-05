@@ -3,85 +3,822 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RIPPLE // AI Finance Controller</title>
+
+  <title>FinSight Enterprise | Financial Operations Intelligence</title>
+
+  <meta
+    name="description"
+    content="FinSight Enterprise is a financial operations intelligence platform for analysing business transactions, cash flow, receivables, payables, and financial risks."
+  />
+
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
+  <!-- Application shell -->
+  <div id="appShell" class="app-shell">
 
-  <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-    <div>
-      <h1 style="margin: 0; color: #fff; font-size: 1.5rem;">RIPPLE // AI FINANCE CONTROLLER</h1>
-      <p style="margin: 0.25rem 0 0; color: #a78bfa; font-size: 0.8rem;">KNOW YOUR CASH. PROVE IT.</p>
-    </div>
-    <div class="terminal-banner">
-      <div>[ INITIALIZING RIPPLE CORE... ]</div>
-      <div>[ OPERATOR: SAHITHYA BOGOLU // BUILD 2026.09 ]</div>
-      <div>[ STATUS: LOCAL-FIRST // ZERO SERVER-SIDE STORAGE ]</div>
-    </div>
-  </header>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark">F</div>
+        <div>
+          <h1>FinSight</h1>
+          <span>Enterprise Intelligence</span>
+        </div>
+      </div>
 
-  <div class="control-bar">
-    <div style="display: flex; gap: 0.75rem; align-items: center;">
-      <button class="btn-judge" onclick="runJudgeMode()">⚡ RUN JUDGE MODE</button>
-      <select id="currency-select" onchange="runJudgeMode()" style="background: #1e1133; color: #fff; border: 1px solid #4c1d95; padding: 0.5rem; border-radius: 4px;">
-        <option value="INR">INR (₹)</option>
-        <option value="USD">USD ($)</option>
-        <option value="EUR">EUR (€)</option>
-        <option value="GBP">GBP (£)</option>
-        <option value="AED">AED (د.إ)</option>
-      </select>
-    </div>
-    <div style="font-size: 0.75rem; color: #9ca3af;">
-      🔓 LLM LAYER: OFF (TIER 1 DETERMINISTIC)
-    </div>
+      <nav class="main-navigation" aria-label="Main navigation">
+        <button class="nav-item active" data-section="dashboard">
+          <span>▦</span>
+          Dashboard
+        </button>
+
+        <button class="nav-item" data-section="transactions">
+          <span>▤</span>
+          Transactions
+        </button>
+
+        <button class="nav-item" data-section="cashflow">
+          <span>◒</span>
+          Cash Flow
+        </button>
+
+        <button class="nav-item" data-section="workingCapital">
+          <span>◫</span>
+          Working Capital
+        </button>
+
+        <button class="nav-item" data-section="risk">
+          <span>⚠</span>
+          Risk Centre
+        </button>
+
+        <button class="nav-item" data-section="simulator">
+          <span>⌁</span>
+          Scenario Simulator
+        </button>
+
+        <button class="nav-item" data-section="reports">
+          <span>▥</span>
+          Reports
+        </button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <button class="nav-item" data-section="privacy">
+          <span>⌕</span>
+          Privacy & Security
+        </button>
+
+        <button class="nav-item" data-section="disclaimer">
+          <span>ⓘ</span>
+          Disclaimer
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main area -->
+    <main class="main-content">
+
+      <!-- Top bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-button" id="mobileMenuButton">
+            ☰
+          </button>
+
+          <div>
+            <p class="eyebrow">Financial Operations Platform</p>
+            <h2 id="pageTitle">Executive Dashboard</h2>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <span class="data-status" id="dataStatus">
+            <span class="status-dot"></span>
+            No data loaded
+          </span>
+
+          <button class="button button-secondary" id="newAnalysisButton">
+            New Analysis
+          </button>
+        </div>
+      </header>
+
+      <!-- Welcome screen -->
+      <section class="welcome-screen" id="welcomeScreen">
+        <div class="welcome-content">
+          <div class="welcome-badge">ENTERPRISE FINANCIAL INTELLIGENCE</div>
+
+          <h2>Make financial operations clearer, faster, and more controlled.</h2>
+
+          <p>
+            Analyse transaction data, monitor cash flow, identify working-capital
+            pressure, and evaluate financial risks through one controlled workspace.
+          </p>
+
+          <div class="welcome-actions">
+            <button class="button button-primary" id="uploadDataButton">
+              Upload Financial Data
+            </button>
+
+            <button class="button button-secondary" id="loadSampleButton">
+              Explore Sample Dataset
+            </button>
+          </div>
+
+          <input
+            type="file"
+            id="fileInput"
+            accept=".csv,.xlsx,.xls"
+            hidden
+          />
+
+          <div class="welcome-security">
+            <span>🔒</span>
+            <div>
+              <strong>Privacy-first processing</strong>
+              <p>
+                Files are processed in your browser. FinSight does not upload
+                your financial data to a remote server in this version.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="welcome-panel">
+          <div class="panel-heading">
+            <span class="panel-kicker">CONTROLLED WORKSPACE</span>
+            <h3>Built around financial operations</h3>
+          </div>
+
+          <div class="feature-list">
+            <div class="feature-item">
+              <span>01</span>
+              <div>
+                <strong>Data validation</strong>
+                <p>Identify missing, inconsistent, or unusable records.</p>
+              </div>
+            </div>
+
+            <div class="feature-item">
+              <span>02</span>
+              <div>
+                <strong>Operational visibility</strong>
+                <p>Monitor inflows, outflows, receivables, and payables.</p>
+              </div>
+            </div>
+
+            <div class="feature-item">
+              <span>03</span>
+              <div>
+                <strong>Risk prioritisation</strong>
+                <p>Highlight unusual transactions and financial pressure.</p>
+              </div>
+            </div>
+
+            <div class="feature-item">
+              <span>04</span>
+              <div>
+                <strong>Scenario planning</strong>
+                <p>Estimate the impact of changes to cash inflows and costs.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Application workspace -->
+      <section class="workspace hidden" id="workspace">
+
+        <!-- Dashboard -->
+        <section class="content-section active" id="dashboardSection">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">OVERVIEW</p>
+              <h3>Executive Dashboard</h3>
+              <p class="section-description">
+                A consolidated view of the organisation’s financial position.
+              </p>
+            </div>
+
+            <div class="section-actions">
+              <button class="button button-secondary" id="exportReportButton">
+                Export Report
+              </button>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card">
+              <div class="metric-label">Total Inflows</div>
+              <div class="metric-value" id="totalInflows">₹0</div>
+              <div class="metric-footnote" id="inflowFootnote">
+                Based on uploaded records
+              </div>
+            </article>
+
+            <article class="metric-card">
+              <div class="metric-label">Total Outflows</div>
+              <div class="metric-value" id="totalOutflows">₹0</div>
+              <div class="metric-footnote" id="outflowFootnote">
+                Based on uploaded records
+              </div>
+            </article>
+
+            <article class="metric-card">
+              <div class="metric-label">Net Cash Flow</div>
+              <div class="metric-value" id="netCashFlow">₹0</div>
+              <div class="metric-footnote" id="cashFlowFootnote">
+                Inflows less outflows
+              </div>
+            </article>
+
+            <article class="metric-card">
+              <div class="metric-label">Estimated Cash Position</div>
+              <div class="metric-value" id="estimatedCash">₹0</div>
+              <div class="metric-footnote">
+                Based on available dataset information
+              </div>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <article class="card chart-card large-card">
+              <div class="card-header">
+                <div>
+                  <p class="section-kicker">TREND ANALYSIS</p>
+                  <h3>Cash Flow Trend</h3>
+                </div>
+
+                <span class="card-meta" id="trendPeriod">
+                  All available periods
+                </span>
+              </div>
+
+              <div class="chart-container">
+                <canvas id="cashFlowChart"></canvas>
+                <div class="empty-chart hidden" id="cashFlowChartEmpty">
+                  Not enough date-based data to display a trend.
+                </div>
+              </div>
+            </article>
+
+            <article class="card risk-summary-card">
+              <div class="card-header">
+                <div>
+                  <p class="section-kicker">CONTROL MONITORING</p>
+                  <h3>Risk Summary</h3>
+                </div>
+              </div>
+
+              <div class="risk-score-container">
+                <div class="risk-score" id="riskScore">0</div>
+                <div>
+                  <strong id="riskScoreLabel">No assessment</strong>
+                  <p id="riskScoreDescription">
+                    Upload data to generate a risk assessment.
+                  </p>
+                </div>
+              </div>
+
+              <div class="risk-summary-list" id="riskSummaryList">
+                <div class="empty-state-small">
+                  No risk indicators available.
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="dashboard-grid bottom-grid">
+            <article class="card">
+              <div class="card-header">
+                <div>
+                  <p class="section-kicker">LIQUIDITY</p>
+                  <h3>Cash Position</h3>
+                </div>
+              </div>
+
+              <div class="cash-position">
+                <div class="cash-position-value" id="cashPositionValue">
+                  ₹0
+                </div>
+
+                <div class="cash-position-bar">
+                  <div id="cashPositionBar"></div>
+                </div>
+
+                <p id="cashPositionMessage">
+                  Upload financial data to assess liquidity.
+                </p>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-header">
+                <div>
+                  <p class="section-kicker">DATA QUALITY</p>
+                  <h3>Dataset Integrity</h3>
+                </div>
+              </div>
+
+              <div class="quality-list">
+                <div class="quality-row">
+                  <span>Total records</span>
+                  <strong id="recordCount">0</strong>
+                </div>
+
+                <div class="quality-row">
+                  <span>Valid records</span>
+                  <strong id="validRecordCount">0</strong>
+                </div>
+
+                <div class="quality-row">
+                  <span>Unclassified records</span>
+                  <strong id="unclassifiedCount">0</strong>
+                </div>
+
+                <div class="quality-row">
+                  <span>Data quality score</span>
+                  <strong id="dataQualityScore">0%</strong>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Transactions -->
+        <section class="content-section" id="transactionsSection">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">RECORD-LEVEL ANALYSIS</p>
+              <h3>Transactions</h3>
+              <p class="section-description">
+                Review, search, filter, and classify uploaded financial records.
+              </p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="table-toolbar">
+              <div class="search-box">
+                <span>⌕</span>
+                <input
+                  type="search"
+                  id="transactionSearch"
+                  placeholder="Search transactions..."
+                />
+              </div>
+
+              <select id="transactionTypeFilter" class="select-control">
+                <option value="all">All types</option>
+                <option value="income">Income</option>
+                <option value="expense">Expense</option>
+                <option value="receivable">Receivable</option>
+                <option value="payable">Payable</option>
+                <option value="unclassified">Unclassified</option>
+              </select>
+
+              <button class="button button-secondary" id="downloadCsvButton">
+                Download CSV
+              </button>
+            </div>
+
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Risk</th>
+                  </tr>
+                </thead>
+
+                <tbody id="transactionsTableBody"></tbody>
+              </table>
+            </div>
+
+            <div class="table-footer">
+              <span id="transactionTableSummary">
+                No records available.
+              </span>
+
+              <div class="pagination-controls">
+                <button class="pagination-button" id="previousPageButton">
+                  Previous
+                </button>
+
+                <span id="pageIndicator">Page 1</span>
+
+                <button class="pagination-button" id="nextPageButton">
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Cash flow -->
+        <section class="content-section" id="cashflowSection">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">LIQUIDITY MANAGEMENT</p>
+              <h3>Cash Flow Analysis</h3>
+              <p class="section-description">
+                Understand operating inflows, outflows, and projected liquidity.
+              </p>
+            </div>
+          </div>
+
+          <div class="metric-grid three-columns">
+            <article class="metric-card">
+              <div class="metric-label">Average Monthly Inflow</div>
+              <div class="metric-value" id="averageMonthlyInflow">₹0</div>
+            </article>
+
+            <article class="metric-card">
+              <div class="metric-label">Average Monthly Outflow</div>
+              <div class="metric-value" id="averageMonthlyOutflow">₹0</div>
+            </article>
+
+            <article class="metric-card">
+              <div class="metric-label">Monthly Burn Rate</div>
+              <div class="metric-value" id="monthlyBurnRate">₹0</div>
+            </article>
+          </div>
+
+          <div class="card chart-card">
+            <div class="card-header">
+              <div>
+                <p class="section-kicker">FORECAST</p>
+                <h3>Projected Cash Position</h3>
+              </div>
+            </div>
+
+            <div class="chart-container large-chart">
+              <canvas id="forecastChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <p class="section-kicker">MANAGEMENT INSIGHT</p>
+                <h3>Cash Flow Commentary</h3>
+              </div>
+            </div>
+
+            <div class="insight-box" id="cashFlowCommentary">
+              Upload data to generate commentary.
+            </div>
+          </div>
+        </section>
+
+        <!-- Working capital -->
+        <section class="content-section" id="workingCapitalSection">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">WORKING CAPITAL</p>
+              <h3>Receivables & Payables</h3>
+              <p class="section-description">
+                Monitor amounts expected from customers and amounts owed to suppliers.
+              </p>
+            </div>
+          </div>
+
+          <div class="metric-grid two-columns">
+            <article class="metric-card">
+              <div class="metric-label">Outstanding Receivables</div>
+              <div class="metric-value" id="receivablesValue">₹0</div>
+              <div class="metric-footnote">
+                Amounts expected to be collected
+              </div>
+            </article>
+
+            <article class="metric-card">
+              <div class="metric-label">Outstanding Payables</div>
+              <div class="metric-value" id="payablesValue">₹0</div>
+              <div class="metric-footnote">
+                Amounts expected to be paid
+              </div>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <article class="card">
+              <div class="card-header">
+                <div>
+                  <p class="section-kicker">RECEIVABLES</p>
+                  <h3>Receivables Overview</h3>
+                </div>
+              </div>
+
+              <div id="receivablesList" class="operations-list"></div>
+            </article>
+
+            <article class="card">
+              <div class="card-header">
+                <div>
+                  <p class="section-kicker">PAYABLES</p>
+                  <h3>Payables Overview</h3>
+                </div>
+              </div>
+
+              <div id="payablesList" class="operations-list"></div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Risk -->
+        <section class="content-section" id="riskSection">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">CONTROL MONITORING</p>
+              <h3>Risk Centre</h3>
+              <p class="section-description">
+                Identify potential data-quality, liquidity, and transaction-level risks.
+              </p>
+            </div>
+          </div>
+
+          <div class="metric-grid three-columns">
+            <article class="metric-card">
+              <div class="metric-label">Overall Risk Score</div>
+              <div class="metric-value" id="overallRiskScore">0</div>
+            </article>
+
+            <article class="metric-card">
+              <div class="metric-label">High-Risk Records</div>
+              <div class="metric-value" id="highRiskCount">0</div>
+            </article>
+
+            <article class="metric-card">
+              <div class="metric-label">Data Exceptions</div>
+              <div class="metric-value" id="dataExceptionCount">0</div>
+            </article>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <p class="section-kicker">RISK REGISTER</p>
+                <h3>Identified Indicators</h3>
+              </div>
+            </div>
+
+            <div id="riskRegister" class="risk-register"></div>
+          </div>
+        </section>
+
+        <!-- Simulator -->
+        <section class="content-section" id="simulatorSection">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">SCENARIO PLANNING</p>
+              <h3>Scenario Simulator</h3>
+              <p class="section-description">
+                Estimate how changes in inflows and outflows could affect cash position.
+              </p>
+            </div>
+          </div>
+
+          <div class="simulator-grid">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <p class="section-kicker">INPUT ASSUMPTIONS</p>
+                  <h3>Adjust Scenario</h3>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="inflowAdjustment">
+                  Change in inflows
+                  <span id="inflowAdjustmentValue">0%</span>
+                </label>
+
+                <input
+                  type="range"
+                  id="inflowAdjustment"
+                  min="-50"
+                  max="100"
+                  value="0"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="outflowAdjustment">
+                  Change in outflows
+                  <span id="outflowAdjustmentValue">0%</span>
+                </label>
+
+                <input
+                  type="range"
+                  id="outflowAdjustment"
+                  min="-50"
+                  max="100"
+                  value="0"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="scenarioMonths">Projection period</label>
+
+                <select id="scenarioMonths" class="select-control">
+                  <option value="3">3 months</option>
+                  <option value="6" selected>6 months</option>
+                  <option value="12">12 months</option>
+                </select>
+              </div>
+
+              <button class="button button-primary full-width" id="runScenarioButton">
+                Run Scenario
+              </button>
+            </div>
+
+            <div class="card scenario-result-card">
+              <div class="card-header">
+                <div>
+                  <p class="section-kicker">SCENARIO RESULT</p>
+                  <h3>Projected Outcome</h3>
+                </div>
+              </div>
+
+              <div class="scenario-result">
+                <div class="scenario-result-row">
+                  <span>Projected inflows</span>
+                  <strong id="scenarioInflows">₹0</strong>
+                </div>
+
+                <div class="scenario-result-row">
+                  <span>Projected outflows</span>
+                  <strong id="scenarioOutflows">₹0</strong>
+                </div>
+
+                <div class="scenario-result-row">
+                  <span>Projected net cash flow</span>
+                  <strong id="scenarioNetCashFlow">₹0</strong>
+                </div>
+
+                <div class="scenario-result-row highlight">
+                  <span>Projected cash position</span>
+                  <strong id="scenarioCashPosition">₹0</strong>
+                </div>
+              </div>
+
+              <div class="insight-box" id="scenarioCommentary">
+                Adjust the assumptions and run the scenario.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Reports -->
+        <section class="content-section" id="reportsSection">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">REPORTING</p>
+              <h3>Reports & Exports</h3>
+              <p class="section-description">
+                Generate a structured summary of the current analysis.
+              </p>
+            </div>
+          </div>
+
+          <div class="reports-grid">
+            <article class="card report-card">
+              <div class="report-icon">▥</div>
+              <h3>Executive Summary</h3>
+              <p>
+                Export key financial metrics, risk indicators, and management commentary.
+              </p>
+              <button class="button button-primary" id="exportExecutiveReportButton">
+                Export Summary
+              </button>
+            </article>
+
+            <article class="card report-card">
+              <div class="report-icon">▤</div>
+              <h3>Transaction Register</h3>
+              <p>
+                Download the processed transaction dataset as a CSV file.
+              </p>
+              <button class="button button-secondary" id="exportTransactionReportButton">
+                Export Transactions
+              </button>
+            </article>
+
+            <article class="card report-card">
+              <div class="report-icon">⚠</div>
+              <h3>Risk Register</h3>
+              <p>
+                Export identified risk indicators and recommended review actions.
+              </p>
+              <button class="button button-secondary" id="exportRiskReportButton">
+                Export Risks
+              </button>
+            </article>
+          </div>
+        </section>
+
+        <!-- Privacy -->
+        <section class="content-section" id="privacySection">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">DATA GOVERNANCE</p>
+              <h3>Privacy & Security</h3>
+            </div>
+          </div>
+
+          <div class="card legal-card">
+            <h3>How your data is handled</h3>
+
+            <ul class="legal-list">
+              <li>
+                Uploaded files are processed locally in your browser in this version.
+              </li>
+
+              <li>
+                Your financial records are not intentionally transmitted to a remote
+                server by this application.
+              </li>
+
+              <li>
+                Analysis history is stored only in your browser when local storage is enabled.
+              </li>
+
+              <li>
+                Do not upload passwords, payment-card details, authentication tokens,
+                government identification documents, or other unnecessary sensitive information.
+              </li>
+
+              <li>
+                Clear your browser storage or use the New Analysis function when working
+                on a shared computer.
+              </li>
+
+              <li>
+                Local browser processing does not replace an organisation’s formal
+                information-security, access-control, retention, or regulatory requirements.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Disclaimer -->
+        <section class="content-section" id="disclaimerSection">
+          <div class="section-header">
+            <div>
+              <p class="section-kicker">IMPORTANT INFORMATION</p>
+              <h3>Disclaimer</h3>
+            </div>
+          </div>
+
+          <div class="card legal-card disclaimer-card">
+            <h3>Decision-support tool only</h3>
+
+            <p>
+              FinSight Enterprise is an analytical and decision-support tool.
+              It is not a substitute for professional accounting, audit, tax,
+              legal, treasury, investment, or financial advice.
+            </p>
+
+            <p>
+              Calculations are based entirely on the quality, completeness, and
+              structure of the uploaded data. The application may classify records
+              incorrectly or produce estimates that require professional review.
+            </p>
+
+            <p>
+              Users remain responsible for validating all outputs before relying
+              on them for business, financial, regulatory, or operational decisions.
+            </p>
+
+            <p>
+              No forecast, risk score, classification, or recommendation should
+              be interpreted as a guarantee of future financial performance.
+            </p>
+          </div>
+        </section>
+
+      </section>
+
+      <!-- Toast notification -->
+      <div class="toast hidden" id="toast">
+        <span id="toastMessage"></span>
+      </div>
+
+    </main>
   </div>
 
-  <div class="scorecard-grid">
-    <div class="kpi-card">
-      <div class="kpi-title">THROUGHPUT</div>
-      <div class="kpi-value" id="kpi-throughput">0 records</div>
-      <div class="kpi-title" id="kpi-throughput-sub" style="color: #22c55e; margin-top: 0.25rem;">-</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">MATCH RATE</div>
-      <div class="kpi-value" id="kpi-match-rate">0%</div>
-      <div class="kpi-title" id="kpi-match-sub" style="margin-top: 0.25rem;">0/0 Matches</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">ACCURACY VS GROUND TRUTH</div>
-      <div class="kpi-value" id="kpi-accuracy" style="color: #a855f7;">0%</div>
-      <div class="kpi-title" id="kpi-accuracy-sub" style="margin-top: 0.25rem;">-</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">SURFACED EXCEPTIONS</div>
-      <div class="kpi-value" id="kpi-exceptions" style="color: #f97316;">0</div>
-      <div class="kpi-title" style="color: #f87171; margin-top: 0.25rem;">0 Hidden / 0 Dropped</div>
-    </div>
-  </div>
+  <!-- Required third-party spreadsheet parser -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <div class="table-container">
-    <h3 style="margin-top: 0; color: #fff;">UNIFIED EXCEPTION LEDGER</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>ROW ID</th>
-          <th>LOOP</th>
-          <th>REASON CODE</th>
-          <th>CONF.</th>
-          <th>EVIDENCE</th>
-          <th>SUGGESTED ACTION</th>
-        </tr>
-      </thead>
-      <tbody id="exception-rows">
-      </tbody>
-    </table>
-  </div>
-
-  <footer style="margin-top: 2rem; border-top: 1px solid #1f1138; padding-top: 1rem; display: flex; justify-content: space-between; font-size: 0.75rem; color: #7c3aed;">
-    <div>FX Rates timestamped: Sep 2026 (Illustrative offline cache) — Not tax advice</div>
-    <a href="https://github.com/sahithyabogolu" target="_blank" style="color: #7c3aed; text-decoration: none;">⟡ built by sahithyabogolu</a>
-  </footer>
-
+  <!-- Application JavaScript -->
   <script src="app.js"></script>
 </body>
 </html>
