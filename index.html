@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RIPPLE — Finance Control Workspace</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 <body>
   <header class="app-header">
@@ -53,7 +53,7 @@
         <div class="feature-steps">
           <div class="step-card">
             <span class="step-num">01</span>
-            <p>Upload a file or boot demo data for focused reconciliation.</p>
+            <p>Upload files or link sheets for focused reconciliation.</p>
           </div>
           <div class="step-card">
             <span class="step-num">02</span>
@@ -73,18 +73,25 @@
         </div>
         <h2>Bring your numbers.</h2>
         <p>
-          Upload an Excel or CSV file containing transactions, receivables, payables, or cash-flow forecasts.
+          Support for CSV, Excel (.xlsx, .xls), PDF, Word (.doc, .docx), or Google Sheets links.
         </p>
         
         <div class="file-drop-zone" id="drop-zone">
-          <input type="file" id="file-input" accept=".csv,.txt" class="file-input-hidden">
+          <input type="file" id="file-input" accept=".csv,.txt,.xlsx,.xls,.pdf,.doc,.docx" class="file-input-hidden">
           <label for="file-input" class="file-label">
             <span class="upload-icon">⚡</span>
-            <span>Choose a CSV file or drop it here</span>
+            <span>Choose a file (.csv, .xlsx, .pdf, .docx) or drop it here</span>
           </label>
         </div>
 
-        <div class="action-divider"><span>OR</span></div>
+        <div class="action-divider"><span>OR PASTE GOOGLE SHEETS LINK</span></div>
+
+        <div class="url-input-group">
+          <input type="text" id="sheets-url-input" class="input-text" placeholder="https://docs.google.com/spreadsheets/d/..." />
+          <button id="load-sheets-btn" class="btn btn-secondary">Fetch Sheet</button>
+        </div>
+
+        <div class="action-divider"><span>OR DEMO</span></div>
 
         <button id="load-demo-btn" class="btn btn-primary btn-block">
           ⚡ Boot Synthetic Dataset (50+ Records)
@@ -342,6 +349,7 @@
     <span>Built by Sahithya</span>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
