@@ -1,1 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RIPPLE — Your Next Best Move</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
+    <header class="navbar">
+        <div class="logo">RIP<span>PLE</span></div>
+        <div class="tagline">Your next best financial move.</div>
+    </header>
+
+    <main class="container">
+
+        <section class="hero">
+            <div>
+                <p class="eyebrow">AI FINANCE DECISION ENGINE</p>
+                <h1>Know your cash.<br><span>Know what to do next.</span></h1>
+                <p class="hero-text">
+                    Upload your business transactions and turn messy financial data
+                    into a clear, prioritised action plan.
+                </p>
+            </div>
+
+            <div class="upload-card">
+                <div class="upload-icon">↑</div>
+                <h3>Upload your transactions</h3>
+                <p>Use a CSV file to get started.</p>
+
+                <label for="csvFile" class="upload-button">
+                    Choose CSV file
+                </label>
+
+                <input type="file" id="csvFile" accept=".csv" hidden>
+
+                <p class="upload-note">No data leaves your browser.</p>
+            </div>
+        </section>
+
+        <section class="dashboard hidden" id="dashboard">
+
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">YOUR FINANCIAL SNAPSHOT</p>
+                    <h2>Here's what needs your attention.</h2>
+                </div>
+                <button class="reset-button" id="resetButton">
+                    Upload another file
+                </button>
+            </div>
+
+            <div class="metrics">
+                <div class="metric-card">
+                    <p>Available cash</p>
+                    <h3 id="cashValue">₹0</h3>
+                    <span>Based on your transactions</span>
+                </div>
+
+                <div class="metric-card">
+                    <p>Money expected</p>
+                    <h3 id="receivablesValue">₹0</h3>
+                    <span>Outstanding customer payments</span>
+                </div>
+
+                <div class="metric-card">
+                    <p>Upcoming bills</p>
+                    <h3 id="billsValue">₹0</h3>
+                    <span>Due in the next 7 days</span>
+                </div>
+            </div>
+
+            <div class="content-grid">
+
+                <div class="panel">
+                    <div class="panel-heading">
+                        <div>
+                            <p class="eyebrow">PRIORITY ACTIONS</p>
+                            <h2>Your next best moves</h2>
+                        </div>
+                    </div>
+
+                    <div id="actionsList">
+                        <!-- Actions will appear here -->
+                    </div>
+                </div>
+
+                <div class="panel simulation-panel">
+                    <p class="eyebrow">CASH-FLOW SIMULATION</p>
+                    <h2>What happens in the next 7 days?</h2>
+                    <p class="panel-description">
+                        See how upcoming payments could affect your available cash.
+                    </p>
+
+                    <button class="primary-button" id="simulateButton">
+                        Simulate next 7 days →
+                    </button>
+
+                    <div id="simulationResult" class="simulation-result hidden">
+                        <!-- Simulation will appear here -->
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <footer>
+        <p>RIPPLE · Built for the Razorpay AI Builder Buildathon</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
