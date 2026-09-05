@@ -1,106 +1,100 @@
 "use strict";
 
-/* =========================================================
-   RIPPLE — Finance Control Workspace
-   ========================================================= */
+/*
+  FinSight Enterprise
+  --------------------
+  Client-side financial operations analysis.
+
+  Important:
+  - Files are processed in the browser.
+  - No financial data is sent to a server by this application.
+  - Outputs require professional validation.
+*/
+
+const state = {
+  records: [],
+  filteredRecords: [],
+  currentPage: 1,
+  pageSize: 15,
+  currentSection: "dashboard",
+  chartInstances: {},
+  fileName: "",
+  hasData: false,
+  preferences: {
+    saveHistory: true
+  }
+};
 
 const $ = (id) => document.getElementById(id);
 
-const uploadInput = $("csvFile");
-const fileName = $("fileName");
-const statusMessage = $("statusMessage");
-const errorMessage = $("errorMessage");
+const elements = {
+  appShell: $("appShell"),
+  sidebar: $("sidebar"),
+  mobileMenuButton: $("mobileMenuButton"),
+  welcomeScreen: $("welcomeScreen"),
+  workspace: $("workspace"),
+  fileInput: $("fileInput"),
+  uploadDataButton: $("uploadDataButton"),
+  loadSampleButton: $("loadSampleButton"),
+  newAnalysisButton: $("newAnalysisButton"),
+  pageTitle: $("pageTitle"),
+  dataStatus: $("dataStatus"),
+  toast: $("toast"),
+  toastMessage: $("toastMessage")
+};
 
-const welcomeModal = $("welcomeModal");
-const userNameInput = $("userNameInput");
-const saveNameButton = $("saveNameButton");
-const headerGreeting = $("headerGreeting");
-const heroDescription = $("heroDescription");
+/* ----------------------------- Utilities ----------------------------- */
 
-const privacyModal = $("privacyModal");
-const openPrivacyButton = $("openPrivacyButton");
-const closePrivacyButton = $("closePrivacyButton");
-const saveAnalysesToggle = $("saveAnalysesToggle");
-const clearWorkspaceButton = $("clearWorkspaceButton");
-const privacyFeedback = $("privacyFeedback");
+function showToast(message) {
+  if (!elements.toast || !elements.toastMessage) return;
 
-const workspaceSection = $("workspaceSection");
-const workspaceTitle = $("workspaceTitle");
-const historyList = $("historyList");
-const historyCount = $("historyCount");
-const newAnalysisButton = $("newAnalysisButton");
+  elements.toastMessage.textContent = message;
+  elements.toast.classList.remove("hidden");
 
-const dashboard = $("dashboard");
-const dashboardTitle = $("dashboardTitle");
-const dashboardSubtitle = $("dashboardSubtitle");
+  clearTimeout(showToast.timeout);
 
-const cashValue = $("cashValue");
-const receivablesValue = $("receivablesValue");
-const billsValue = $("billsValue");
+  showToast.timeout = setTimeout(() => {
+    elements.toast.classList.add("hidden");
+  }, 3500);
+}
 
-const riskSummary = $("riskSummary");
-const riskDescription = $("riskDescription");
-const riskScoreTag = $("riskScoreTag");
-const riskWarning = $("riskWarning");
-const riskWarningList = $("riskWarningList");
-const riskSuccess = $("riskSuccess");
+function formatCurrency(value) {
+  const number = Number(value) || 0;
 
-const dataQuality = $("dataQuality");
-const actionsList = $("actionsList");
-const evidenceList = $("evidenceList");
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0
+  }).format(number);
+}
 
-const saveCurrentAnalysisButton = $("saveCurrentAnalysisButton");
-const deleteCurrentAnalysisButton = $("deleteCurrentAnalysisButton");
-const resetButton = $("resetButton");
+function formatNumber(value) {
+  return new Intl.NumberFormat("en-IN", {
+    maximumFractionDigits: 0
+  }).format(Number(value) || 0);
+}
 
-const chartContainer = $("chartContainer");
-const chartLegend = $("chartLegend");
-const chartTabs = document.querySelectorAll(".chart-tab");
-
-const collectionRate = $("collectionRate");
-const paymentDelay = $("paymentDelay");
-const collectionRateLabel = $("collectionRateLabel");
-const paymentDelayLabel = $("paymentDelayLabel");
-const simulateButton = $("simulateButton");
-const simulationResult = $("simulationResult");
-
-const sampleButton = $("sampleButton");
-
-const STORAGE_NAME = "ripple_user_name";
-const STORAGE_HISTORY = "ripple_analysis_history";
-const STORAGE_SAVE_SETTING = "ripple_save_setting";
-
-let currentAnalysis = null;
-let currentChart = "bar";
-let currentHistoryId = null;
-
-/* =========================================================
-   General helpers
-   ========================================================= */
-
-function cleanText(value) {
+function normaliseText(value) {
   return String(value ?? "")
     .trim()
-    .replace(/\s+/g, " ");
-}
-
-function normaliseHeader(value) {
-  return cleanText(value)
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
+    .replace(/[^a-z0-9]+/g, " ");
 }
 
-function parseNumber(value) {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+function cleanHeader(value) {
+  return normaliseText(value).replace(/\s+/g, " ");
+}
+
+function parseAmount(value) {
+  if (typeof value === "number") return value;
 
   const cleaned = String(value ?? "")
-    .replace(/₹/g, "")
-    .replace(/,/g, "")
-    .replace(/%/g, "")
-    .replace(/[^\d.-]/g, "");
+    .replace(/[₹,$€£\s]/g, "")
+    .replace(/[()]/g, "-")
+    .replace(/,/g, "");
 
-  const number = Number(cleaned);
-  return Number.isFinite(number) ? number : 0;
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function parseDate(value) {
@@ -110,29 +104,23 @@ function parseDate(value) {
     return value;
   }
 
-  const date = new Date(value);
+  if (typeof value === "number") {
+    const excelDate = new Date(
+      Math.round((value - 25569) * 86400 * 1000)
+    );
 
-  if (!Number.isNaN(date.getTime())) {
-    return date;
+    return Number.isNaN(excelDate.getTime()) ? null : excelDate;
   }
 
-  return null;
-}
+  const date = new Date(value);
 
-function formatCurrency(value) {
-  const amount = Number(value) || 0;
-
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0
-  }).format(amount);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function formatDate(value) {
   const date = parseDate(value);
 
-  if (!date) return "Date unavailable";
+  if (!date) return "—";
 
   return date.toLocaleDateString("en-IN", {
     day: "2-digit",
@@ -141,1292 +129,1635 @@ function formatDate(value) {
   });
 }
 
-function escapeHTML(value) {
+function dateKey(value) {
+  const date = parseDate(value);
+
+  if (!date) return null;
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}`;
+}
+
+function escapeHtml(value) {
   return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-function setStatus(message = "", isError = false) {
-  if (isError) {
-    errorMessage.textContent = message;
-    statusMessage.textContent = "";
-  } else {
-    statusMessage.textContent = message;
-    errorMessage.textContent = "";
+function downloadFile(filename, content, type = "text/plain") {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+
+  URL.revokeObjectURL(url);
+}
+
+function safeId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
   }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function getColumn(row, aliases) {
-  const keys = Object.keys(row);
-  const match = keys.find((key) =>
-    aliases.some(
-      (alias) => normaliseHeader(key) === normaliseHeader(alias)
-    )
-  );
+/* ----------------------------- Navigation ----------------------------- */
 
-  return match ? row[match] : null;
+const sectionTitles = {
+  dashboard: "Executive Dashboard",
+  transactions: "Transactions",
+  cashflow: "Cash Flow Analysis",
+  workingCapital: "Working Capital",
+  risk: "Risk Centre",
+  simulator: "Scenario Simulator",
+  reports: "Reports & Exports",
+  privacy: "Privacy & Security",
+  disclaimer: "Disclaimer"
+};
+
+function showSection(sectionName) {
+  state.currentSection = sectionName;
+
+  document.querySelectorAll(".nav-item[data-section]").forEach((button) => {
+    button.classList.toggle(
+      "active",
+      button.dataset.section === sectionName
+    );
+  });
+
+  document.querySelectorAll(".content-section").forEach((section) => {
+    section.classList.remove("active");
+  });
+
+  const section = $(`${sectionName}Section`);
+
+  if (section) {
+    section.classList.add("active");
+  }
+
+  if (elements.pageTitle) {
+    elements.pageTitle.textContent =
+      sectionTitles[sectionName] || "FinSight Enterprise";
+  }
+
+  elements.sidebar?.classList.remove("open");
 }
 
-function getDateFromRow(row) {
-  return (
-    getColumn(row, [
-      "date",
-      "transaction date",
-      "invoice date",
-      "due date",
-      "payment date"
-    ]) || null
-  );
-}
+function initialiseNavigation() {
+  document.querySelectorAll(".nav-item[data-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      showSection(button.dataset.section);
+    });
+  });
 
-function getAmountFromRow(row) {
-  return parseNumber(
-    getColumn(row, [
-      "amount",
-      "value",
-      "total",
-      "total amount",
-      "invoice amount",
-      "money in",
-      "money out",
-      "balance",
-      "outstanding"
-    ])
-  );
-}
-
-function getDescriptionFromRow(row) {
-  return cleanText(
-    getColumn(row, [
-      "description",
-      "details",
-      "particulars",
-      "customer",
-      "supplier",
-      "name",
-      "category"
-    ]) || "Financial item"
-  );
-}
-
-function getRowsFromSheet(sheet) {
-  return XLSX.utils.sheet_to_json(sheet, {
-    defval: ""
+  elements.mobileMenuButton?.addEventListener("click", () => {
+    elements.sidebar?.classList.toggle("open");
   });
 }
 
-/* =========================================================
-   User identity and privacy
-   ========================================================= */
+/* ----------------------------- Data loading ----------------------------- */
 
-function getUserName() {
-  return localStorage.getItem(STORAGE_NAME) || "";
-}
+function findColumn(headers, possibleNames) {
+  const normalisedHeaders = headers.map(cleanHeader);
 
-function saveUserName() {
-  const name = cleanText(userNameInput.value);
+  for (const name of possibleNames) {
+    const target = cleanHeader(name);
 
-  if (!name) {
-    userNameInput.focus();
-    return;
+    const exactIndex = normalisedHeaders.indexOf(target);
+
+    if (exactIndex !== -1) {
+      return headers[exactIndex];
+    }
   }
 
-  localStorage.setItem(STORAGE_NAME, name);
-  welcomeModal.classList.add("hidden");
-  document.body.classList.remove("modal-open");
+  for (let index = 0; index < normalisedHeaders.length; index++) {
+    const header = normalisedHeaders[index];
 
-  updatePersonalisation();
-}
-
-function updatePersonalisation() {
-  const name = getUserName();
-
-  if (name) {
-    headerGreeting.textContent = `Welcome back, ${name}`;
-    heroDescription.textContent =
-      `Your private finance workspace is ready, ${name}. Turn financial data into clear cash-flow insights and practical decisions.`;
-    workspaceTitle.textContent = `${name}'s analysis workspace.`;
-  } else {
-    headerGreeting.textContent = "Finance control workspace";
+    if (
+      possibleNames.some((name) => {
+        const target = cleanHeader(name);
+        return header.includes(target) || target.includes(header);
+      })
+    ) {
+      return headers[index];
+    }
   }
+
+  return null;
 }
 
-function openWelcomeModal() {
-  welcomeModal.classList.remove("hidden");
-  document.body.classList.add("modal-open");
+function classifyRecord(record) {
+  const description = normaliseText(record.description);
+  const category = normaliseText(record.category);
+  const type = normaliseText(record.originalType);
 
-  setTimeout(() => {
-    userNameInput.focus();
-  }, 100);
-}
+  const combined = `${description} ${category} ${type}`;
 
-function openPrivacyModal() {
-  saveAnalysesToggle.checked =
-    localStorage.getItem(STORAGE_SAVE_SETTING) === "true";
-
-  privacyFeedback.textContent = "";
-  privacyModal.classList.remove("hidden");
-  document.body.classList.add("modal-open");
-}
-
-function closePrivacyModal() {
-  privacyModal.classList.add("hidden");
-  document.body.classList.remove("modal-open");
-}
-
-function updateSavePreference() {
-  localStorage.setItem(
-    STORAGE_SAVE_SETTING,
-    String(saveAnalysesToggle.checked)
-  );
-
-  privacyFeedback.textContent = saveAnalysesToggle.checked
-    ? "Analyses will now be saved locally when you choose Save analysis."
-    : "Automatic local saving is turned off.";
-}
-
-function getSavedHistory() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_HISTORY) || "[]");
-  } catch {
-    return [];
+  if (
+    combined.includes("receivable") ||
+    combined.includes("customer due") ||
+    combined.includes("accounts receivable") ||
+    combined.includes("invoice raised")
+  ) {
+    return "receivable";
   }
+
+  if (
+    combined.includes("payable") ||
+    combined.includes("supplier due") ||
+    combined.includes("accounts payable") ||
+    combined.includes("vendor")
+  ) {
+    return "payable";
+  }
+
+  if (
+    combined.includes("income") ||
+    combined.includes("revenue") ||
+    combined.includes("sales") ||
+    combined.includes("receipt") ||
+    combined.includes("credit")
+  ) {
+    return "income";
+  }
+
+  if (
+    combined.includes("expense") ||
+    combined.includes("cost") ||
+    combined.includes("purchase") ||
+    combined.includes("rent") ||
+    combined.includes("salary") ||
+    combined.includes("debit")
+  ) {
+    return "expense";
+  }
+
+  if (record.inflow > 0 && record.outflow === 0) {
+    return "income";
+  }
+
+  if (record.outflow > 0 && record.inflow === 0) {
+    return "expense";
+  }
+
+  if (record.amount > 0) {
+    return record.amountDirection === "in" ? "income" : "expense";
+  }
+
+  return "unclassified";
 }
 
-function saveHistory(history) {
-  localStorage.setItem(STORAGE_HISTORY, JSON.stringify(history));
-}
+function normaliseRecord(raw, headers, index) {
+  const dateColumn = findColumn(headers, [
+    "date",
+    "transaction date",
+    "posting date",
+    "invoice date",
+    "value date"
+  ]);
 
-function clearWorkspace() {
-  const confirmed = window.confirm(
-    "Clear all saved analyses from this browser?"
-  );
+  const descriptionColumn = findColumn(headers, [
+    "description",
+    "narration",
+    "details",
+    "particulars",
+    "transaction",
+    "reference"
+  ]);
 
-  if (!confirmed) return;
+  const categoryColumn = findColumn(headers, [
+    "category",
+    "account",
+    "account name",
+    "ledger",
+    "department"
+  ]);
 
-  localStorage.removeItem(STORAGE_HISTORY);
-  renderHistory();
-  privacyFeedback.textContent = "Saved workspace cleared.";
-}
+  const typeColumn = findColumn(headers, [
+    "type",
+    "transaction type",
+    "classification",
+    "nature"
+  ]);
 
-/* =========================================================
-   Workbook processing
-   ========================================================= */
+  const amountColumn = findColumn(headers, [
+    "amount",
+    "value",
+    "transaction amount",
+    "total"
+  ]);
 
-function classifyRows(rows) {
-  const result = {
-    transactions: [],
-    receivables: [],
-    payables: [],
-    forecast: [],
-    other: []
+  const inflowColumn = findColumn(headers, [
+    "inflow",
+    "income",
+    "credit",
+    "money in",
+    "receipts"
+  ]);
+
+  const outflowColumn = findColumn(headers, [
+    "outflow",
+    "expense",
+    "debit",
+    "money out",
+    "payments"
+  ]);
+
+  const receivableColumn = findColumn(headers, [
+    "receivable",
+    "receivables",
+    "accounts receivable",
+    "amount due from customer"
+  ]);
+
+  const payableColumn = findColumn(headers, [
+    "payable",
+    "payables",
+    "accounts payable",
+    "amount due to supplier"
+  ]);
+
+  const rawAmount = amountColumn ? parseAmount(raw[amountColumn]) : 0;
+  const inflow = inflowColumn ? Math.abs(parseAmount(raw[inflowColumn])) : 0;
+  const outflow = outflowColumn ? Math.abs(parseAmount(raw[outflowColumn])) : 0;
+
+  const amountDirection =
+    inflow > 0 ? "in" : outflow > 0 ? "out" : "out";
+
+  const amount =
+    rawAmount ||
+    inflow ||
+    outflow ||
+    Math.abs(parseAmount(raw[receivableColumn])) ||
+    Math.abs(parseAmount(raw[payableColumn]));
+
+  const record = {
+    id: safeId(),
+    index,
+    date: dateColumn ? raw[dateColumn] : null,
+    description: descriptionColumn
+      ? raw[descriptionColumn]
+      : `Transaction ${index + 1}`,
+    category: categoryColumn ? raw[categoryColumn] : "Uncategorised",
+    originalType: typeColumn ? raw[typeColumn] : "",
+    amount,
+    inflow,
+    outflow,
+    receivable: receivableColumn
+      ? Math.abs(parseAmount(raw[receivableColumn]))
+      : 0,
+    payable: payableColumn
+      ? Math.abs(parseAmount(raw[payableColumn]))
+      : 0,
+    amountDirection,
+    raw
   };
 
-  rows.forEach((row) => {
-    const headers = Object.keys(row)
-      .map(normaliseHeader)
-      .join(" ");
+  record.type = classifyRecord(record);
 
-    const description = getDescriptionFromRow(row).toLowerCase();
+  if (record.type === "income" && record.inflow === 0) {
+    record.inflow = record.amount;
+  }
 
-    const outstanding = parseNumber(
-      getColumn(row, ["outstanding", "balance", "amount due"])
-    );
+  if (record.type === "expense" && record.outflow === 0) {
+    record.outflow = record.amount;
+  }
 
-    const received = parseNumber(
-      getColumn(row, ["received", "paid", "collected", "amount received"])
-    );
+  if (record.type === "receivable" && record.receivable === 0) {
+    record.receivable = record.amount;
+  }
 
-    const moneyIn = parseNumber(
-      getColumn(row, ["money in", "inflow", "income", "receipts"])
-    );
+  if (record.type === "payable" && record.payable === 0) {
+    record.payable = record.amount;
+  }
 
-    const moneyOut = parseNumber(
-      getColumn(row, ["money out", "outflow", "expense", "payments"])
-    );
+  record.risk = assessRecordRisk(record);
 
-    const amount = getAmountFromRow(row);
-
-    if (
-      headers.includes("customer") ||
-      headers.includes("receivable") ||
-      headers.includes("invoice") ||
-      headers.includes("amountdue") ||
-      outstanding > 0 ||
-      received > 0
-    ) {
-      result.receivables.push({
-        ...row,
-        amount: outstanding || amount,
-        received,
-        date: getDateFromRow(row),
-        description
-      });
-
-      return;
-    }
-
-    if (
-      headers.includes("supplier") ||
-      headers.includes("payable") ||
-      headers.includes("vendor") ||
-      headers.includes("bill") ||
-      headers.includes("expense")
-    ) {
-      result.payables.push({
-        ...row,
-        amount: amount || outstanding,
-        date: getDateFromRow(row),
-        description
-      });
-
-      return;
-    }
-
-    if (
-      headers.includes("forecast") ||
-      headers.includes("openingcash") ||
-      headers.includes("closingcash") ||
-      headers.includes("expectedcollections")
-    ) {
-      result.forecast.push({
-        ...row,
-        amount,
-        date: getDateFromRow(row),
-        description
-      });
-
-      return;
-    }
-
-    if (moneyIn || moneyOut || amount) {
-      result.transactions.push({
-        ...row,
-        amount,
-        moneyIn,
-        moneyOut,
-        date: getDateFromRow(row),
-        description
-      });
-
-      return;
-    }
-
-    result.other.push(row);
-  });
-
-  return result;
+  return record;
 }
 
-function calculateAnalysis(rows, sourceName, isDemo = false) {
-  const grouped = classifyRows(rows);
+function assessRecordRisk(record) {
+  const description = normaliseText(record.description);
+  let score = 0;
 
-  const transactionInflow = grouped.transactions.reduce(
-    (sum, row) => sum + (row.moneyIn || 0),
-    0
-  );
+  if (!record.date) score += 1;
+  if (!record.description || description.length < 3) score += 1;
+  if (!record.category || record.category === "Uncategorised") score += 1;
+  if (!record.amount || record.amount <= 0) score += 2;
+  if (record.type === "unclassified") score += 2;
+  if (record.amount > 1000000) score += 1;
 
-  const transactionOutflow = grouped.transactions.reduce(
-    (sum, row) => sum + (row.moneyOut || 0),
-    0
-  );
+  if (score >= 4) return "high";
+  if (score >= 2) return "medium";
 
-  const receivables = grouped.receivables.reduce(
-    (sum, row) => sum + Math.max(row.amount || 0, 0),
-    0
-  );
+  return "low";
+}
 
-  const received = grouped.receivables.reduce(
-    (sum, row) => sum + Math.max(row.received || 0, 0),
-    0
-  );
+function processRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("The uploaded file does not contain any records.");
+  }
 
-  const payables = grouped.payables.reduce(
-    (sum, row) => sum + Math.max(row.amount || 0, 0),
-    0
-  );
+  const headers = Object.keys(rows[0]);
 
-  const forecastCash = grouped.forecast.reduce(
-    (sum, row) => sum + (row.amount || 0),
-    0
-  );
+  if (headers.length === 0) {
+    throw new Error("No usable columns were found.");
+  }
 
-  const totalInflow = transactionInflow + received;
-  const totalOutflow = transactionOutflow + payables;
-
-  const estimatedCash =
-    forecastCash || totalInflow - totalOutflow;
-
-  const collectionRate =
-    receivables > 0
-      ? Math.round((received / receivables) * 100)
-      : 0;
-
-  const overdueReceivables = grouped.receivables.filter((row) => {
-    const date = parseDate(row.date);
-    return date && date < new Date() && row.amount > row.received;
-  });
-
-  const overdueAmount = overdueReceivables.reduce(
-    (sum, row) => sum + Math.max((row.amount || 0) - (row.received || 0), 0),
-    0
-  );
-
-  const essentialPayables = grouped.payables
-    .filter((row) => {
-      const text = row.description.toLowerCase();
-
+  const records = rows
+    .map((row, index) => normaliseRecord(row, headers, index))
+    .filter((record) => {
       return (
-        text.includes("salary") ||
-        text.includes("rent") ||
-        text.includes("tax") ||
-        text.includes("electric") ||
-        text.includes("utility") ||
-        text.includes("supplier")
+        record.description ||
+        record.amount ||
+        record.inflow ||
+        record.outflow
       );
-    })
-    .reduce((sum, row) => sum + row.amount, 0);
+    });
 
-  const nonEssentialPayables = Math.max(
-    payables - essentialPayables,
-    0
-  );
-
-  let riskScore = 0;
-
-  if (estimatedCash < 0) riskScore += 45;
-  else if (estimatedCash < payables * 0.5) riskScore += 30;
-  else if (estimatedCash < payables) riskScore += 15;
-
-  if (overdueAmount > receivables * 0.25) riskScore += 30;
-  else if (overdueAmount > 0) riskScore += 15;
-
-  if (payables > receivables) riskScore += 15;
-  if (collectionRate < 50) riskScore += 10;
-
-  riskScore = Math.min(riskScore, 100);
-
-  let riskLevel = "low";
-
-  if (riskScore >= 65) riskLevel = "high";
-  else if (riskScore >= 35) riskLevel = "medium";
-
-  const warnings = [];
-
-  if (estimatedCash < 0) {
-    warnings.push("Estimated cash position is negative.");
+  if (records.length === 0) {
+    throw new Error("No usable financial records were found.");
   }
 
-  if (overdueAmount > 0) {
-    warnings.push(
-      `${formatCurrency(overdueAmount)} may be tied up in overdue receivables.`
-    );
+  state.records = records;
+  state.filteredRecords = [...records];
+  state.currentPage = 1;
+  state.hasData = true;
+
+  updateDataStatus();
+  renderAll();
+  saveHistory();
+
+  elements.welcomeScreen?.classList.add("hidden");
+  elements.workspace?.classList.remove("hidden");
+
+  showSection("dashboard");
+  showToast(`${records.length} records successfully loaded.`);
+}
+
+async function readFile(file) {
+  if (!file) return;
+
+  const extension = file.name.split(".").pop().toLowerCase();
+
+  try {
+    if (extension === "csv") {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      state.fileName = file.name;
+      processRows(rows);
+      return;
+    }
+
+    if (["xlsx", "xls"].includes(extension)) {
+      if (!window.XLSX) {
+        throw new Error("Spreadsheet library could not be loaded.");
+      }
+
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(firstSheet, {
+        defval: ""
+      });
+
+      state.fileName = file.name;
+      processRows(rows);
+      return;
+    }
+
+    throw new Error("Please upload a CSV or Excel file.");
+  } catch (error) {
+    showToast(error.message || "Unable to process the file.");
+  }
+}
+
+function parseCsv(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) {
+    throw new Error("The CSV file must contain a header and at least one row.");
   }
 
-  if (payables > receivables) {
-    warnings.push("Upcoming obligations exceed recorded receivables.");
-  }
+  const parseLine = (line) => {
+    const result = [];
+    let current = "";
+    let insideQuotes = false;
 
-  if (collectionRate < 50 && receivables > 0) {
-    warnings.push("Collection performance may need attention.");
-  }
+    for (let index = 0; index < line.length; index++) {
+      const character = line[index];
 
-  const actions = [];
+      if (character === '"' && line[index + 1] === '"') {
+        current += '"';
+        index++;
+        continue;
+      }
 
-  if (overdueAmount > 0) {
-    actions.push(
-      `Prioritise follow-up on overdue receivables worth ${formatCurrency(overdueAmount)}.`
-    );
-  }
+      if (character === '"') {
+        insideQuotes = !insideQuotes;
+        continue;
+      }
 
-  if (nonEssentialPayables > 0) {
-    actions.push(
-      `Review or reschedule non-essential payments worth ${formatCurrency(nonEssentialPayables)}.`
-    );
-  }
+      if (character === "," && !insideQuotes) {
+        result.push(current.trim());
+        current = "";
+      } else {
+        current += character;
+      }
+    }
 
-  if (collectionRate < 70 && receivables > 0) {
-    actions.push(
-      "Create a short collection plan for the largest outstanding customers."
-    );
-  }
+    result.push(current.trim());
+    return result;
+  };
 
-  if (estimatedCash < 0) {
-    actions.push(
-      "Protect essential payments first and review near-term funding needs."
-    );
-  }
+  const headers = parseLine(lines[0]);
 
-  if (!actions.length) {
-    actions.push(
-      "Continue monitoring collections, upcoming bills, and cash movements."
-    );
-  }
+  return lines.slice(1).map((line) => {
+    const values = parseLine(line);
+    const row = {};
 
-  const evidence = [
-    `${grouped.transactions.length} transaction records reviewed.`,
-    `${grouped.receivables.length} receivable records identified.`,
-    `${grouped.payables.length} payable records identified.`
+    headers.forEach((header, index) => {
+      row[header] = values[index] ?? "";
+    });
+
+    return row;
+  });
+}
+
+/* ----------------------------- Sample data ----------------------------- */
+
+function loadSampleData() {
+  const sampleRows = [
+    {
+      Date: "2026-01-05",
+      Description: "Customer payment - Alpha Industries",
+      Category: "Sales",
+      Type: "Income",
+      Amount: 420000
+    },
+    {
+      Date: "2026-01-08",
+      Description: "Office rent",
+      Category: "Administration",
+      Type: "Expense",
+      Amount: 85000
+    },
+    {
+      Date: "2026-01-12",
+      Description: "Supplier invoice - Beta Supplies",
+      Category: "Accounts Payable",
+      Type: "Payable",
+      Amount: 160000
+    },
+    {
+      Date: "2026-01-18",
+      Description: "Customer invoice outstanding",
+      Category: "Accounts Receivable",
+      Type: "Receivable",
+      Amount: 230000
+    },
+    {
+      Date: "2026-02-03",
+      Description: "Customer payment - Gamma Retail",
+      Category: "Sales",
+      Type: "Income",
+      Amount: 510000
+    },
+    {
+      Date: "2026-02-10",
+      Description: "Employee salaries",
+      Category: "Payroll",
+      Type: "Expense",
+      Amount: 190000
+    },
+    {
+      Date: "2026-02-15",
+      Description: "Software subscriptions",
+      Category: "Technology",
+      Type: "Expense",
+      Amount: 45000
+    },
+    {
+      Date: "2026-03-04",
+      Description: "Customer payment - Alpha Industries",
+      Category: "Sales",
+      Type: "Income",
+      Amount: 390000
+    },
+    {
+      Date: "2026-03-11",
+      Description: "Supplier payment",
+      Category: "Accounts Payable",
+      Type: "Payable",
+      Amount: 125000
+    },
+    {
+      Date: "2026-03-20",
+      Description: "Marketing campaign",
+      Category: "Marketing",
+      Type: "Expense",
+      Amount: 90000
+    }
   ];
 
-  if (grouped.forecast.length) {
-    evidence.push(`${grouped.forecast.length} forecast records included.`);
-  }
+  state.fileName = "Sample Dataset";
+  processRows(sampleRows);
+}
 
-  if (isDemo) {
-    evidence.push("This analysis uses fictional demonstration data.");
-  } else {
-    evidence.push("Analysis is based only on the uploaded file.");
+/* ----------------------------- Calculations ----------------------------- */
+
+function getTotals() {
+  const records = state.records;
+
+  const totalInflows = records.reduce(
+    (sum, record) => sum + record.inflow,
+    0
+  );
+
+  const totalOutflows = records.reduce(
+    (sum, record) => sum + record.outflow,
+    0
+  );
+
+  const receivables = records.reduce(
+    (sum, record) => sum + record.receivable,
+    0
+  );
+
+  const payables = records.reduce(
+    (sum, record) => sum + record.payable,
+    0
+  );
+
+  const netCashFlow = totalInflows - totalOutflows;
+
+  return {
+    totalInflows,
+    totalOutflows,
+    receivables,
+    payables,
+    netCashFlow,
+    estimatedCash: netCashFlow
+  };
+}
+
+function getMonthlyData() {
+  const months = {};
+
+  state.records.forEach((record) => {
+    const key = dateKey(record.date);
+
+    if (!key) return;
+
+    if (!months[key]) {
+      months[key] = {
+        month: key,
+        inflows: 0,
+        outflows: 0,
+        net: 0
+      };
+    }
+
+    months[key].inflows += record.inflow;
+    months[key].outflows += record.outflow;
+    months[key].net =
+      months[key].inflows - months[key].outflows;
+  });
+
+  return Object.values(months).sort((a, b) =>
+    a.month.localeCompare(b.month)
+  );
+}
+
+function getRiskAssessment() {
+  const records = state.records;
+
+  const highRiskCount = records.filter(
+    (record) => record.risk === "high"
+  ).length;
+
+  const mediumRiskCount = records.filter(
+    (record) => record.risk === "medium"
+  ).length;
+
+  const unclassifiedCount = records.filter(
+    (record) => record.type === "unclassified"
+  ).length;
+
+  const missingDateCount = records.filter(
+    (record) => !record.date
+  ).length;
+
+  const total = records.length || 1;
+
+  let score =
+    (highRiskCount * 8 +
+      mediumRiskCount * 3 +
+      unclassifiedCount * 4 +
+      missingDateCount * 2) /
+    total;
+
+  score = Math.min(100, Math.round(score * 10));
+
+  let label = "Low risk";
+
+  if (score >= 60) {
+    label = "High attention required";
+  } else if (score >= 30) {
+    label = "Moderate attention required";
   }
 
   return {
-    id: crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random()}`,
-    sourceName,
-    createdAt: new Date().toISOString(),
-    isDemo,
-    rows,
-    grouped,
-    metrics: {
-      estimatedCash,
-      receivables,
-      payables,
-      received,
-      totalInflow,
-      totalOutflow,
-      collectionRate,
-      overdueAmount,
-      essentialPayables,
-      nonEssentialPayables,
-      riskScore,
-      riskLevel
-    },
-    warnings,
-    actions,
-    evidence
+    score,
+    label,
+    highRiskCount,
+    mediumRiskCount,
+    unclassifiedCount,
+    missingDateCount
   };
 }
 
-/* =========================================================
-   Rendering
-   ========================================================= */
+function getDataQuality() {
+  const total = state.records.length || 1;
 
-function renderAnalysis(analysis) {
-  currentAnalysis = analysis;
-  currentHistoryId = analysis.id;
-
-  workspaceSection.classList.remove("hidden");
-  dashboard.classList.remove("hidden");
-
-  dashboardTitle.textContent = analysis.isDemo
-    ? "Explore a fictional cash position."
-    : "Your cash position, clearly.";
-
-  dashboardSubtitle.textContent = analysis.isDemo
-    ? "A fictional example showing how RIPPLE turns financial data into decisions."
-    : `Analysis based on ${analysis.sourceName}.`;
-
-  cashValue.textContent = formatCurrency(
-    analysis.metrics.estimatedCash
-  );
-
-  receivablesValue.textContent = formatCurrency(
-    analysis.metrics.receivables
-  );
-
-  billsValue.textContent = formatCurrency(
-    analysis.metrics.payables
-  );
-
-  const riskLevel = analysis.metrics.riskLevel;
-  riskSummary.className = `risk-badge ${riskLevel}`;
-  riskSummary.textContent =
-    `${riskLevel.charAt(0).toUpperCase()}${riskLevel.slice(1)} risk`;
-
-  riskScoreTag.textContent =
-    `Score ${analysis.metrics.riskScore}`;
-
-  riskDescription.textContent =
-    riskLevel === "high"
-      ? "The current data suggests a meaningful liquidity pressure that needs attention."
-      : riskLevel === "medium"
-        ? "The current data suggests some pressure points worth monitoring."
-        : "The current position appears manageable based on the information provided.";
-
-  riskWarningList.innerHTML = analysis.warnings
-    .map((warning) => `<li>${escapeHTML(warning)}</li>`)
-    .join("");
-
-  riskWarning.classList.toggle(
-    "hidden",
-    analysis.warnings.length === 0
-  );
-
-  riskSuccess.classList.toggle(
-    "hidden",
-    analysis.warnings.length > 0
-  );
-
-  dataQuality.textContent = analysis.rows.length
-    ? `${analysis.rows.length} rows reviewed`
-    : "Limited data";
-
-  actionsList.innerHTML = analysis.actions
-    .map((action) => `<li>${escapeHTML(action)}</li>`)
-    .join("");
-
-  evidenceList.innerHTML = analysis.evidence
-    .map((item) => `<li>${escapeHTML(item)}</li>`)
-    .join("");
-
-  collectionRate.value = 0;
-  paymentDelay.value = 0;
-  collectionRateLabel.textContent = "0%";
-  paymentDelayLabel.textContent = "0 days";
-
-  renderChart(currentChart);
-  updateSimulation();
-
-  dashboard.scrollIntoView({
-    behavior: "smooth",
-    block: "start"
-  });
-}
-
-function renderHistory() {
-  const history = getSavedHistory();
-
-  historyCount.textContent =
-    `${history.length} saved`;
-
-  if (!history.length) {
-    historyList.innerHTML = `
-      <div class="empty-history">
-        <span>◌</span>
-        <p>Your saved analyses will appear here.</p>
-      </div>
-    `;
-    return;
-  }
-
-  historyList.innerHTML = history
-    .map(
-      (item) => `
-        <button
-          type="button"
-          class="history-item ${
-            item.id === currentHistoryId ? "active" : ""
-          }"
-          data-history-id="${escapeHTML(item.id)}"
-        >
-          <span class="history-item-name">
-            ${escapeHTML(item.sourceName)}
-          </span>
-
-          <span class="history-item-meta">
-            ${formatDate(item.createdAt)}
-          </span>
-        </button>
-      `
-    )
-    .join("");
-
-  document.querySelectorAll(".history-item").forEach((button) => {
-    button.addEventListener("click", () => {
-      const id = button.dataset.historyId;
-      const selected = history.find((item) => item.id === id);
-
-      if (selected) {
-        renderAnalysis(selected);
-        renderHistory();
-      }
-    });
-  });
-}
-
-function saveCurrentAnalysis() {
-  if (!currentAnalysis) return;
-
-  const history = getSavedHistory();
-  const existingIndex = history.findIndex(
-    (item) => item.id === currentAnalysis.id
-  );
-
-  if (existingIndex >= 0) {
-    history[existingIndex] = currentAnalysis;
-  } else {
-    history.unshift(currentAnalysis);
-  }
-
-  saveHistory(history);
-  renderHistory();
-
-  setStatus("Analysis saved locally in your workspace.");
-}
-
-function deleteCurrentAnalysis() {
-  if (!currentAnalysis) return;
-
-  const confirmed = window.confirm(
-    "Delete this saved analysis from your workspace?"
-  );
-
-  if (!confirmed) return;
-
-  const history = getSavedHistory().filter(
-    (item) => item.id !== currentAnalysis.id
-  );
-
-  saveHistory(history);
-  currentHistoryId = null;
-  renderHistory();
-
-  setStatus("Saved analysis deleted.");
-}
-
-function resetWorkspace() {
-  currentAnalysis = null;
-  currentHistoryId = null;
-
-  dashboard.classList.add("hidden");
-  workspaceSection.classList.add("hidden");
-
-  uploadInput.value = "";
-  fileName.textContent = "No file selected";
-  setStatus("");
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
-}
-
-/* =========================================================
-   Charts
-   ========================================================= */
-
-function getChartData() {
-  if (!currentAnalysis) return [];
-
-  const metrics = currentAnalysis.metrics;
-
-  return [
-    {
-      label: "Cash",
-      value: Math.max(metrics.estimatedCash, 0)
-    },
-    {
-      label: "Receivables",
-      value: metrics.receivables
-    },
-    {
-      label: "Bills",
-      value: metrics.payables
-    }
-  ];
-}
-
-function renderChart(type = "bar") {
-  currentChart = type;
-
-  chartTabs.forEach((tab) => {
-    tab.classList.toggle(
-      "active",
-      tab.dataset.chart === type
+  const valid = state.records.filter((record) => {
+    return (
+      record.date &&
+      record.description &&
+      record.amount > 0 &&
+      record.type !== "unclassified"
     );
-  });
+  }).length;
 
-  const data = getChartData();
+  const score = Math.round((valid / total) * 100);
 
-  if (!data.length) {
-    chartContainer.innerHTML = `
-      <div class="chart-empty">
-        Your chart will appear after an analysis is loaded.
-      </div>
+  return {
+    total: state.records.length,
+    valid,
+    unclassified: state.records.filter(
+      (record) => record.type === "unclassified"
+    ).length,
+    score
+  };
+}
+
+/* ----------------------------- Rendering ----------------------------- */
+
+function updateDataStatus() {
+  if (!elements.dataStatus) return;
+
+  if (!state.hasData) {
+    elements.dataStatus.innerHTML = `
+      <span class="status-dot"></span>
+      No data loaded
     `;
-    chartLegend.innerHTML = "";
     return;
   }
 
-  if (type === "pie") {
-    renderPieChart(data);
-  } else if (type === "line") {
-    renderLineChart(data);
-  } else {
-    renderBarChart(data);
+  elements.dataStatus.innerHTML = `
+    <span class="status-dot" style="background:#18794e"></span>
+    ${escapeHtml(state.fileName || "Dataset loaded")}
+  `;
+}
+
+function renderAll() {
+  renderDashboard();
+  renderTransactions();
+  renderCashFlow();
+  renderWorkingCapital();
+  renderRisk();
+  runScenario();
+}
+
+function renderDashboard() {
+  const totals = getTotals();
+  const risk = getRiskAssessment();
+  const quality = getDataQuality();
+
+  $("totalInflows").textContent = formatCurrency(totals.totalInflows);
+  $("totalOutflows").textContent = formatCurrency(totals.totalOutflows);
+  $("netCashFlow").textContent = formatCurrency(totals.netCashFlow);
+  $("estimatedCash").textContent = formatCurrency(totals.estimatedCash);
+
+  $("cashFlowFootnote").textContent =
+    totals.netCashFlow >= 0
+      ? "Positive net cash movement"
+      : "Negative net cash movement";
+
+  $("riskScore").textContent = risk.score;
+  $("riskScoreLabel").textContent = risk.label;
+
+  $("riskScoreDescription").textContent =
+    risk.score >= 60
+      ? "Several records require immediate review."
+      : risk.score >= 30
+      ? "Some records require management attention."
+      : "No significant issues detected from available data.";
+
+  $("recordCount").textContent = formatNumber(quality.total);
+  $("validRecordCount").textContent = formatNumber(quality.valid);
+  $("unclassifiedCount").textContent = formatNumber(quality.unclassified);
+  $("dataQualityScore").textContent = `${quality.score}%`;
+
+  $("cashPositionValue").textContent = formatCurrency(
+    totals.estimatedCash
+  );
+
+  const cashBar = $("cashPositionBar");
+
+  if (cashBar) {
+    const max = Math.max(
+      totals.totalInflows,
+      totals.totalOutflows,
+      Math.abs(totals.estimatedCash),
+      1
+    );
+
+    cashBar.style.width = `${Math.min(
+      100,
+      (Math.abs(totals.estimatedCash) / max) * 100
+    )}%`;
+
+    cashBar.style.background =
+      totals.estimatedCash >= 0
+        ? "var(--success)"
+        : "var(--danger)";
   }
+
+  $("cashPositionMessage").textContent =
+    totals.estimatedCash >= 0
+      ? "The available dataset indicates a positive net cash position."
+      : "The available dataset indicates a negative net cash position.";
+
+  renderRiskSummary();
+  renderCashFlowChart();
 }
 
-function renderBarChart(data) {
-  const width = 700;
-  const height = 280;
-  const padding = 45;
-  const max = Math.max(...data.map((item) => item.value), 1);
-  const chartHeight = height - padding * 2;
-  const barWidth = 100;
-  const gap = 65;
+function renderRiskSummary() {
+  const risk = getRiskAssessment();
+  const container = $("riskSummaryList");
 
-  const bars = data
-    .map((item, index) => {
-      const barHeight = (item.value / max) * chartHeight;
-      const x = padding + index * (barWidth + gap);
-      const y = height - padding - barHeight;
+  if (!container) return;
 
-      return `
-        <rect
-          class="chart-bar"
-          x="${x}"
-          y="${y}"
-          width="${barWidth}"
-          height="${barHeight}"
-          rx="8"
-        ></rect>
+  const items = [
+    ["High-risk records", risk.highRiskCount],
+    ["Medium-risk records", risk.mediumRiskCount],
+    ["Unclassified records", risk.unclassifiedCount],
+    ["Records without dates", risk.missingDateCount]
+  ];
 
-        <text
-          class="chart-value"
-          x="${x + barWidth / 2}"
-          y="${Math.max(y - 10, 15)}"
-          text-anchor="middle"
-        >
-          ${escapeHTML(formatCurrency(item.value))}
-        </text>
-
-        <text
-          class="chart-label"
-          x="${x + barWidth / 2}"
-          y="${height - 15}"
-          text-anchor="middle"
-        >
-          ${escapeHTML(item.label)}
-        </text>
-      `;
-    })
-    .join("");
-
-  chartContainer.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img">
-      <line
-        class="chart-axis"
-        x1="${padding}"
-        y1="${height - padding}"
-        x2="${width - padding}"
-        y2="${height - padding}"
-      ></line>
-      ${bars}
-    </svg>
-  `;
-
-  renderLegend(data);
-}
-
-function renderLineChart(data) {
-  const width = 700;
-  const height = 280;
-  const padding = 45;
-  const max = Math.max(...data.map((item) => item.value), 1);
-  const chartWidth = width - padding * 2;
-  const chartHeight = height - padding * 2;
-
-  const points = data.map((item, index) => {
-    const x = padding + (index * chartWidth) / (data.length - 1);
-    const y =
-      height -
-      padding -
-      (item.value / max) * chartHeight;
-
-    return { ...item, x, y };
-  });
-
-  const pointString = points
-    .map((point) => `${point.x},${point.y}`)
-    .join(" ");
-
-  const pointMarkup = points
+  container.innerHTML = items
     .map(
-      (point) => `
-        <circle
-          class="chart-point"
-          cx="${point.x}"
-          cy="${point.y}"
-          r="5"
-        ></circle>
-
-        <text
-          class="chart-value"
-          x="${point.x}"
-          y="${point.y - 13}"
-          text-anchor="middle"
-        >
-          ${escapeHTML(formatCurrency(point.value))}
-        </text>
-
-        <text
-          class="chart-label"
-          x="${point.x}"
-          y="${height - 15}"
-          text-anchor="middle"
-        >
-          ${escapeHTML(point.label)}
-        </text>
-      `
-    )
-    .join("");
-
-  chartContainer.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img">
-      <line
-        class="chart-axis"
-        x1="${padding}"
-        y1="${height - padding}"
-        x2="${width - padding}"
-        y2="${height - padding}"
-      ></line>
-
-      <polyline
-        class="chart-line"
-        points="${pointString}"
-      ></polyline>
-
-      ${pointMarkup}
-    </svg>
-  `;
-
-  renderLegend(data);
-}
-
-function renderPieChart(data) {
-  const total = data.reduce((sum, item) => sum + item.value, 0) || 1;
-  const center = 140;
-  const radius = 90;
-
-  let currentAngle = -Math.PI / 2;
-
-  const segments = data
-    .map((item, index) => {
-      const angle = (item.value / total) * Math.PI * 2;
-      const endAngle = currentAngle + angle;
-
-      const x1 = center + radius * Math.cos(currentAngle);
-      const y1 = center + radius * Math.sin(currentAngle);
-      const x2 = center + radius * Math.cos(endAngle);
-      const y2 = center + radius * Math.sin(endAngle);
-
-      const largeArc = angle > Math.PI ? 1 : 0;
-
-      const path = `
-        M ${center} ${center}
-        L ${x1} ${y1}
-        A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}
-        Z
-      `;
-
-      currentAngle = endAngle;
-
-      return `
-        <path
-          class="chart-pie-segment"
-          d="${path}"
-          fill="var(--${index === 0 ? "purple" : index === 1 ? "purple-light" : "green"})"
-        ></path>
-      `;
-    })
-    .join("");
-
-  chartContainer.innerHTML = `
-    <svg viewBox="0 0 700 280" role="img">
-      <g transform="translate(210 0)">
-        ${segments}
-
-        <circle
-          cx="${center}"
-          cy="${center}"
-          r="42"
-          fill="var(--surface)"
-        ></circle>
-
-        <text
-          class="chart-label"
-          x="${center}"
-          y="${center - 4}"
-          text-anchor="middle"
-        >
-          Total
-        </text>
-
-        <text
-          class="chart-value"
-          x="${center}"
-          y="${center + 15}"
-          text-anchor="middle"
-        >
-          ${escapeHTML(formatCurrency(total))}
-        </text>
-      </g>
-    </svg>
-  `;
-
-  renderLegend(data);
-}
-
-function renderLegend(data) {
-  chartLegend.innerHTML = data
-    .map(
-      (item, index) => `
-        <div class="legend-item">
-          <span
-            class="legend-dot"
-            style="background: ${
-              index === 0
-                ? "var(--purple)"
-                : index === 1
-                  ? "var(--purple-light)"
-                  : "var(--green)"
-            }"
-          ></span>
-          <span>${escapeHTML(item.label)}</span>
+      ([label, value]) => `
+        <div class="risk-summary-item">
+          <span>${escapeHtml(label)}</span>
+          <strong>${formatNumber(value)}</strong>
         </div>
       `
     )
     .join("");
 }
 
-/* =========================================================
-   Live scenario simulator
-   ========================================================= */
+function renderCashFlowChart() {
+  const monthlyData = getMonthlyData();
+  const canvas = $("cashFlowChart");
+  const empty = $("cashFlowChartEmpty");
 
-function updateSimulation() {
-  if (!currentAnalysis) return;
+  if (!canvas) return;
 
-  const collectionImprovement = Number(collectionRate.value);
-  const delayDays = Number(paymentDelay.value);
+  if (monthlyData.length === 0) {
+    canvas.classList.add("hidden");
+    empty?.classList.remove("hidden");
+    return;
+  }
 
-  collectionRateLabel.textContent =
-    `${collectionImprovement}%`;
+  canvas.classList.remove("hidden");
+  empty?.classList.add("hidden");
 
-  paymentDelayLabel.textContent =
-    `${delayDays} day${delayDays === 1 ? "" : "s"}`;
+  drawLineChart(
+    canvas,
+    monthlyData.map((item) => item.month),
+    [
+      {
+        label: "Inflows",
+        values: monthlyData.map((item) => item.inflows)
+      },
+      {
+        label: "Outflows",
+        values: monthlyData.map((item) => item.outflows)
+      },
+      {
+        label: "Net",
+        values: monthlyData.map((item) => item.net)
+      }
+    ]
+  );
+}
 
-  const metrics = currentAnalysis.metrics;
+function renderTransactions() {
+  applyTransactionFilters();
 
-  const additionalCollections =
-    metrics.receivables * (collectionImprovement / 100);
+  const body = $("transactionsTableBody");
 
-  const delayedPayments =
-    metrics.nonEssentialPayables *
-    Math.min(delayDays / 30, 1);
+  if (!body) return;
+
+  const start = (state.currentPage - 1) * state.pageSize;
+  const pageRecords = state.filteredRecords.slice(
+    start,
+    start + state.pageSize
+  );
+
+  if (pageRecords.length === 0) {
+    body.innerHTML = `
+      <tr>
+        <td colspan="6" class="empty-table">
+          No matching transactions found.
+        </td>
+      </tr>
+    `;
+  } else {
+    body.innerHTML = pageRecords
+      .map(
+        (record) => `
+          <tr>
+            <td>${escapeHtml(formatDate(record.date))}</td>
+            <td>${escapeHtml(record.description)}</td>
+            <td>${escapeHtml(record.category)}</td>
+            <td>
+              <span class="type-badge type-${escapeHtml(record.type)}">
+                ${escapeHtml(record.type)}
+              </span>
+            </td>
+            <td>${escapeHtml(formatCurrency(record.amount))}</td>
+            <td>
+              <span class="risk-badge risk-${escapeHtml(record.risk)}">
+                ${escapeHtml(record.risk)}
+              </span>
+            </td>
+          </tr>
+        `
+      )
+      .join("");
+  }
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(state.filteredRecords.length / state.pageSize)
+  );
+
+  $("pageIndicator").textContent = `Page ${state.currentPage} of ${totalPages}`;
+
+  $("transactionTableSummary").textContent =
+    `${state.filteredRecords.length} matching record(s)`;
+
+  $("previousPageButton").disabled = state.currentPage <= 1;
+  $("nextPageButton").disabled = state.currentPage >= totalPages;
+}
+
+function applyTransactionFilters() {
+  const search = normaliseText(
+    $("transactionSearch")?.value || ""
+  );
+
+  const type = $("transactionTypeFilter")?.value || "all";
+
+  state.filteredRecords = state.records.filter((record) => {
+    const searchable = normaliseText(
+      `${record.description} ${record.category} ${record.type}`
+    );
+
+    const matchesSearch =
+      !search || searchable.includes(search);
+
+    const matchesType =
+      type === "all" || record.type === type;
+
+    return matchesSearch && matchesType;
+  });
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(state.filteredRecords.length / state.pageSize)
+  );
+
+  if (state.currentPage > totalPages) {
+    state.currentPage = totalPages;
+  }
+}
+
+function renderCashFlow() {
+  const monthlyData = getMonthlyData();
+  const totals = getTotals();
+
+  const months = Math.max(monthlyData.length, 1);
+
+  const averageInflow = totals.totalInflows / months;
+  const averageOutflow = totals.totalOutflows / months;
+  const burnRate = Math.max(0, averageOutflow - averageInflow);
+
+  $("averageMonthlyInflow").textContent =
+    formatCurrency(averageInflow);
+
+  $("averageMonthlyOutflow").textContent =
+    formatCurrency(averageOutflow);
+
+  $("monthlyBurnRate").textContent =
+    formatCurrency(burnRate);
+
+  renderForecastChart();
+
+  $("cashFlowCommentary").textContent =
+    totals.netCashFlow >= 0
+      ? `The dataset indicates positive net cash flow of ${formatCurrency(
+          totals.netCashFlow
+        )}. Management should continue monitoring the timing of collections,
+        supplier payments, and recurring operating costs.`
+      : `The dataset indicates negative net cash flow of ${formatCurrency(
+          Math.abs(totals.netCashFlow)
+        )}. Management should review collection timing, discretionary spending,
+        and upcoming payment obligations.`;
+}
+
+function renderForecastChart() {
+  const monthlyData = getMonthlyData();
+  const canvas = $("forecastChart");
+
+  if (!canvas) return;
+
+  const totals = getTotals();
+  const months = Math.max(monthlyData.length, 1);
+  const averageNet = totals.netCashFlow / months;
+
+  const labels = [];
+  const values = [];
+
+  let currentValue = totals.estimatedCash;
+
+  for (let index = 1; index <= 6; index++) {
+    labels.push(`Month ${index}`);
+    currentValue += averageNet;
+    values.push(currentValue);
+  }
+
+  drawLineChart(canvas, labels, [
+    {
+      label: "Projected cash position",
+      values
+    }
+  ]);
+}
+
+function renderWorkingCapital() {
+  const totals = getTotals();
+
+  $("receivablesValue").textContent =
+    formatCurrency(totals.receivables);
+
+  $("payablesValue").textContent =
+    formatCurrency(totals.payables);
+
+  const receivableRecords = state.records
+    .filter((record) => record.type === "receivable")
+    .slice(0, 8);
+
+  const payableRecords = state.records
+    .filter((record) => record.type === "payable")
+    .slice(0, 8);
+
+  renderOperationsList($("receivablesList"), receivableRecords);
+  renderOperationsList($("payablesList"), payableRecords);
+}
+
+function renderOperationsList(container, records) {
+  if (!container) return;
+
+  if (records.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state-small">
+        No records available.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = records
+    .map(
+      (record) => `
+        <div class="operation-row">
+          <div>
+            <strong>${escapeHtml(record.description)}</strong>
+            <span>${escapeHtml(formatDate(record.date))}</span>
+          </div>
+          <strong>${escapeHtml(formatCurrency(record.amount))}</strong>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function renderRisk() {
+  const risk = getRiskAssessment();
+
+  $("overallRiskScore").textContent = risk.score;
+  $("highRiskCount").textContent = risk.highRiskCount;
+  $("dataExceptionCount").textContent =
+    risk.unclassifiedCount + risk.missingDateCount;
+
+  const riskRecords = state.records
+    .filter((record) => record.risk !== "low")
+    .sort((a, b) => {
+      const weight = {
+        high: 3,
+        medium: 2,
+        low: 1
+      };
+
+      return weight[b.risk] - weight[a.risk];
+    });
+
+  const container = $("riskRegister");
+
+  if (!container) return;
+
+  if (riskRecords.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state-small">
+        No elevated-risk records were identified.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = riskRecords
+    .map((record) => {
+      const reasons = [];
+
+      if (!record.date) reasons.push("Missing date");
+      if (!record.description) reasons.push("Missing description");
+      if (!record.category || record.category === "Uncategorised") {
+        reasons.push("Missing category");
+      }
+      if (record.type === "unclassified") {
+        reasons.push("Unclassified transaction");
+      }
+      if (!record.amount || record.amount <= 0) {
+        reasons.push("Missing amount");
+      }
+      if (record.amount > 1000000) {
+        reasons.push("High-value transaction");
+      }
+
+      return `
+        <div class="risk-summary-item">
+          <div>
+            <strong>${escapeHtml(record.description)}</strong>
+            <div>${escapeHtml(reasons.join(" • ") || "Review required")}</div>
+          </div>
+
+          <span class="risk-badge risk-${escapeHtml(record.risk)}">
+            ${escapeHtml(record.risk)}
+          </span>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+/* ----------------------------- Charts ----------------------------- */
+
+function drawLineChart(canvas, labels, datasets) {
+  const context = canvas.getContext("2d");
+
+  if (!context) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(rect.width, 300);
+  const height = Math.max(rect.height, 270);
+  const ratio = window.devicePixelRatio || 1;
+
+  canvas.width = width * ratio;
+  canvas.height = height * ratio;
+
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, width, height);
+
+  const padding = {
+    top: 25,
+    right: 25,
+    bottom: 45,
+    left: 60
+  };
+
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const allValues = datasets.flatMap((dataset) => dataset.values);
+
+  let minValue = Math.min(...allValues, 0);
+  let maxValue = Math.max(...allValues, 1);
+
+  if (minValue === maxValue) {
+    maxValue += 1;
+  }
+
+  const range = maxValue - minValue;
+
+  const xPosition = (index) => {
+    if (labels.length <= 1) return padding.left + chartWidth / 2;
+
+    return (
+      padding.left +
+      (index / (labels.length - 1)) * chartWidth
+    );
+  };
+
+  const yPosition = (value) => {
+    return (
+      padding.top +
+      chartHeight -
+      ((value - minValue) / range) * chartHeight
+    );
+  };
+
+  context.font = "11px Arial";
+  context.lineWidth = 1;
+  context.strokeStyle = "#e3e8ef";
+  context.fillStyle = "#687386";
+
+  for (let index = 0; index <= 4; index++) {
+    const y = padding.top + (index / 4) * chartHeight;
+    const value = maxValue - (index / 4) * range;
+
+    context.beginPath();
+    context.moveTo(padding.left, y);
+    context.lineTo(width - padding.right, y);
+    context.stroke();
+
+    context.fillText(
+      formatCompactCurrency(value),
+      5,
+      y + 4
+    );
+  }
+
+  labels.forEach((label, index) => {
+    const x = xPosition(index);
+
+    context.fillText(
+      label,
+      x - 22,
+      height - 15
+    );
+  });
+
+  const lineStyles = [
+    "#1f4f8f",
+    "#b42318",
+    "#18794e"
+  ];
+
+  datasets.forEach((dataset, datasetIndex) => {
+    context.beginPath();
+    context.strokeStyle =
+      lineStyles[datasetIndex % lineStyles.length];
+    context.lineWidth = 2.5;
+
+    dataset.values.forEach((value, index) => {
+      const x = xPosition(index);
+      const y = yPosition(value);
+
+      if (index === 0) {
+        context.moveTo(x, y);
+      } else {
+        context.lineTo(x, y);
+      }
+    });
+
+    context.stroke();
+
+    dataset.values.forEach((value, index) => {
+      const x = xPosition(index);
+      const y = yPosition(value);
+
+      context.beginPath();
+      context.fillStyle =
+        lineStyles[datasetIndex % lineStyles.length];
+      context.arc(x, y, 3.5, 0, Math.PI * 2);
+      context.fill();
+    });
+  });
+}
+
+function formatCompactCurrency(value) {
+  const number = Number(value) || 0;
+
+  if (Math.abs(number) >= 10000000) {
+    return `₹${(number / 10000000).toFixed(1)}Cr`;
+  }
+
+  if (Math.abs(number) >= 100000) {
+    return `₹${(number / 100000).toFixed(1)}L`;
+  }
+
+  if (Math.abs(number) >= 1000) {
+    return `₹${(number / 1000).toFixed(1)}K`;
+  }
+
+  return `₹${Math.round(number)}`;
+}
+
+/* ----------------------------- Simulator ----------------------------- */
+
+function updateSliderLabels() {
+  $("inflowAdjustmentValue").textContent =
+    `${$("inflowAdjustment").value}%`;
+
+  $("outflowAdjustmentValue").textContent =
+    `${$("outflowAdjustment").value}%`;
+}
+
+function runScenario() {
+  if (!state.hasData) return;
+
+  const totals = getTotals();
+
+  const inflowAdjustment =
+    Number($("inflowAdjustment")?.value || 0) / 100;
+
+  const outflowAdjustment =
+    Number($("outflowAdjustment")?.value || 0) / 100;
+
+  const months =
+    Number($("scenarioMonths")?.value || 6);
+
+  const monthlyInflows =
+    totals.totalInflows / Math.max(getMonthlyData().length, 1);
+
+  const monthlyOutflows =
+    totals.totalOutflows / Math.max(getMonthlyData().length, 1);
+
+  const projectedInflows =
+    monthlyInflows * (1 + inflowAdjustment) * months;
+
+  const projectedOutflows =
+    monthlyOutflows * (1 + outflowAdjustment) * months;
+
+  const projectedNet =
+    projectedInflows - projectedOutflows;
 
   const projectedCash =
-    metrics.estimatedCash +
-    additionalCollections +
-    delayedPayments;
+    totals.estimatedCash + projectedNet;
 
-  const remainingReceivables = Math.max(
-    metrics.receivables -
-      metrics.received -
-      additionalCollections,
-    0
-  );
+  $("scenarioInflows").textContent =
+    formatCurrency(projectedInflows);
 
-  const resultClass =
-    projectedCash >= metrics.estimatedCash
-      ? "is-positive"
-      : "is-warning";
+  $("scenarioOutflows").textContent =
+    formatCurrency(projectedOutflows);
 
-  simulationResult.className =
-    `simulation-result ${resultClass}`;
+  $("scenarioNetCashFlow").textContent =
+    formatCurrency(projectedNet);
 
-  simulationResult.innerHTML = `
-    With a <strong>${collectionImprovement}% collection improvement</strong>
-    and a <strong>${delayDays}-day payment delay</strong>:
+  $("scenarioCashPosition").textContent =
+    formatCurrency(projectedCash);
 
-    <br /><br />
-
-    Projected cash position:
-    <strong>${escapeHTML(formatCurrency(projectedCash))}</strong>
-
-    <br />
-
-    Additional collections:
-    <strong>${escapeHTML(formatCurrency(additionalCollections))}</strong>
-
-    <br />
-
-    Payments deferred:
-    <strong>${escapeHTML(formatCurrency(delayedPayments))}</strong>
-
-    <br />
-
-    Remaining receivables:
-    <strong>${escapeHTML(formatCurrency(remainingReceivables))}</strong>
-  `;
+  $("scenarioCommentary").textContent =
+    projectedCash >= 0
+      ? `Under this scenario, the projected cash position remains positive at ${formatCurrency(
+          projectedCash
+        )}. This is an estimate based on average historical activity.`
+      : `Under this scenario, the projected cash position becomes negative by ${formatCurrency(
+          Math.abs(projectedCash)
+        )}. Management should review liquidity buffers and payment timing.`;
 }
 
-function runSimulation() {
-  updateSimulation();
-}
+/* ----------------------------- Export ----------------------------- */
 
-/* =========================================================
-   Fictional demo data
-   ========================================================= */
+function recordsToCsv(records) {
+  if (!records.length) return "";
 
-function createSampleRows() {
-  return [
-    {
-      Date: "2026-09-01",
-      Customer: "Urban Nest Retail",
-      Amount: 145000,
-      Received: 45000,
-      Outstanding: 100000
-    },
-    {
-      Date: "2026-08-20",
-      Customer: "The Home Story",
-      Amount: 92000,
-      Received: 20000,
-      Outstanding: 72000
-    },
-    {
-      Date: "2026-08-15",
-      Customer: "Casa Bella Interiors",
-      Amount: 68000,
-      Received: 68000,
-      Outstanding: 0
-    },
-    {
-      Date: "2026-09-05",
-      Supplier: "Jaipur Blue Pottery Works",
-      Amount: 54000
-    },
-    {
-      Date: "2026-09-07",
-      Supplier: "BESCOM",
-      Amount: 18000
-    },
-    {
-      Date: "2026-09-10",
-      Supplier: "Office and operations",
-      Amount: 27000
-    },
-    {
-      Date: "2026-09-02",
-      Description: "Customer collections",
-      MoneyIn: 68000,
-      MoneyOut: 0
-    },
-    {
-      Date: "2026-09-03",
-      Description: "Operating expenses",
-      MoneyIn: 0,
-      MoneyOut: 22000
-    },
-    {
-      Date: "2026-09-04",
-      Description: "Opening cash balance",
-      MoneyIn: 0,
-      MoneyOut: 0,
-      Amount: 185000
-    }
+  const headers = [
+    "Date",
+    "Description",
+    "Category",
+    "Type",
+    "Amount",
+    "Inflow",
+    "Outflow",
+    "Receivable",
+    "Payable",
+    "Risk"
   ];
+
+  const rows = records.map((record) => [
+    record.date || "",
+    record.description,
+    record.category,
+    record.type,
+    record.amount,
+    record.inflow,
+    record.outflow,
+    record.receivable,
+    record.payable,
+    record.risk
+  ]);
+
+  return [headers, ...rows]
+    .map((row) =>
+      row
+        .map((value) => `"${String(value).replaceAll('"', '""')}"`)
+        .join(",")
+    )
+    .join("\n");
 }
 
-function loadSampleData() {
-  const rows = createSampleRows();
+function exportTransactions() {
+  if (!state.hasData) {
+    showToast("Load data before exporting transactions.");
+    return;
+  }
 
-  fileName.textContent = "Fictional RIPPLE demo workspace";
-  setStatus("Fictional demonstration data loaded.");
-
-  const analysis = calculateAnalysis(
-    rows,
-    "Fictional RIPPLE demo workspace",
-    true
+  downloadFile(
+    "finsight-transaction-register.csv",
+    recordsToCsv(state.records),
+    "text/csv;charset=utf-8"
   );
 
-  renderAnalysis(analysis);
+  showToast("Transaction register exported.");
 }
 
-/* =========================================================
-   File upload
-   ========================================================= */
-
-async function processFile(file) {
-  if (!file) return;
-
-  if (!window.XLSX) {
-    setStatus(
-      "The spreadsheet reader is still loading. Please try again.",
-      true
-    );
+function exportRiskRegister() {
+  if (!state.hasData) {
+    showToast("Load data before exporting risks.");
     return;
   }
 
-  const validExtensions = [".xlsx", ".xls", ".csv"];
-  const extension = file.name
-    .toLowerCase()
-    .slice(file.name.lastIndexOf("."));
+  const riskRecords = state.records.filter(
+    (record) => record.risk !== "low"
+  );
 
-  if (!validExtensions.includes(extension)) {
-    setStatus(
-      "Please upload an Excel or CSV file.",
-      true
-    );
+  const csv = recordsToCsv(riskRecords);
+
+  downloadFile(
+    "finsight-risk-register.csv",
+    csv,
+    "text/csv;charset=utf-8"
+  );
+
+  showToast("Risk register exported.");
+}
+
+function exportExecutiveSummary() {
+  if (!state.hasData) {
+    showToast("Load data before exporting the summary.");
     return;
   }
+
+  const totals = getTotals();
+  const risk = getRiskAssessment();
+  const quality = getDataQuality();
+
+  const summary = [
+    "FINSIGHT ENTERPRISE",
+    "EXECUTIVE FINANCIAL SUMMARY",
+    "",
+    `Dataset: ${state.fileName}`,
+    `Generated: ${new Date().toLocaleString("en-IN")}`,
+    "",
+    `Total inflows: ${formatCurrency(totals.totalInflows)}`,
+    `Total outflows: ${formatCurrency(totals.totalOutflows)}`,
+    `Net cash flow: ${formatCurrency(totals.netCashFlow)}`,
+    `Estimated cash position: ${formatCurrency(totals.estimatedCash)}`,
+    `Receivables: ${formatCurrency(totals.receivables)}`,
+    `Payables: ${formatCurrency(totals.payables)}`,
+    "",
+    `Risk score: ${risk.score}`,
+    `Risk assessment: ${risk.label}`,
+    `High-risk records: ${risk.highRiskCount}`,
+    `Data quality score: ${quality.score}%`,
+    "",
+    "DISCLAIMER",
+    "This report is generated for analytical decision support only.",
+    "It is not a substitute for professional accounting, audit, tax, legal,",
+    "treasury, investment, or financial advice."
+  ].join("\n");
+
+  downloadFile(
+    "finsight-executive-summary.txt",
+    summary,
+    "text/plain;charset=utf-8"
+  );
+
+  showToast("Executive summary exported.");
+}
+
+/* ----------------------------- Local history ----------------------------- */
+
+function saveHistory() {
+  if (!state.preferences.saveHistory || !state.hasData) return;
 
   try {
-    setStatus("Reading your financial file...");
-    fileName.textContent = file.name;
+    const history = {
+      fileName: state.fileName,
+      records: state.records,
+      savedAt: new Date().toISOString()
+    };
 
-    const buffer = await file.arrayBuffer();
+    localStorage.setItem(
+      "finsight-analysis-history",
+      JSON.stringify(history)
+    );
+  } catch {
+    showToast("The browser could not save local analysis history.");
+  }
+}
 
-    const workbook = XLSX.read(buffer, {
-      type: "array",
-      cellDates: true
-    });
+function loadHistory() {
+  try {
+    const saved = localStorage.getItem(
+      "finsight-analysis-history"
+    );
 
-    const allRows = [];
+    if (!saved) return;
 
-    workbook.SheetNames.forEach((sheetName) => {
-      const sheet = workbook.Sheets[sheetName];
-      const rows = getRowsFromSheet(sheet);
+    const history = JSON.parse(saved);
 
-      rows.forEach((row) => {
-        allRows.push(row);
-      });
-    });
-
-    if (!allRows.length) {
-      throw new Error("No readable rows were found in this file.");
+    if (!history.records || !Array.isArray(history.records)) {
+      return;
     }
 
-    const analysis = calculateAnalysis(
-      allRows,
-      file.name,
-      false
-    );
+    state.fileName = history.fileName || "Saved analysis";
+    state.records = history.records;
+    state.filteredRecords = [...state.records];
+    state.hasData = state.records.length > 0;
 
-    setStatus(
-      `Analysis complete. ${allRows.length} rows reviewed.`
-    );
-
-    renderAnalysis(analysis);
-  } catch (error) {
-    console.error(error);
-
-    setStatus(
-      error.message ||
-        "Something went wrong while reading the file.",
-      true
-    );
+    if (state.hasData) {
+      updateDataStatus();
+      renderAll();
+      elements.welcomeScreen?.classList.add("hidden");
+      elements.workspace?.classList.remove("hidden");
+    }
+  } catch {
+    localStorage.removeItem("finsight-analysis-history");
   }
 }
 
-/* =========================================================
-   Event listeners
-   ========================================================= */
+/* ----------------------------- Reset ----------------------------- */
 
-saveNameButton.addEventListener("click", saveUserName);
+function resetApplication() {
+  const confirmed = window.confirm(
+    "Start a new analysis? Current browser-stored analysis data will be cleared."
+  );
 
-userNameInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    saveUserName();
-  }
-});
+  if (!confirmed) return;
 
-openPrivacyButton.addEventListener("click", openPrivacyModal);
+  state.records = [];
+  state.filteredRecords = [];
+  state.currentPage = 1;
+  state.fileName = "";
+  state.hasData = false;
 
-closePrivacyButton.addEventListener("click", closePrivacyModal);
+  localStorage.removeItem("finsight-analysis-history");
 
-privacyModal.addEventListener("click", (event) => {
-  if (event.target === privacyModal) {
-    closePrivacyModal();
-  }
-});
+  elements.workspace?.classList.add("hidden");
+  elements.welcomeScreen?.classList.remove("hidden");
 
-saveAnalysesToggle.addEventListener(
-  "change",
-  updateSavePreference
-);
+  updateDataStatus();
+  showToast("New analysis workspace created.");
+}
 
-clearWorkspaceButton.addEventListener(
-  "click",
-  clearWorkspace
-);
+/* ----------------------------- Event listeners ----------------------------- */
 
-uploadInput.addEventListener("change", (event) => {
-  processFile(event.target.files[0]);
-});
-
-sampleButton.addEventListener("click", loadSampleData);
-
-saveCurrentAnalysisButton.addEventListener(
-  "click",
-  saveCurrentAnalysis
-);
-
-deleteCurrentAnalysisButton.addEventListener(
-  "click",
-  deleteCurrentAnalysis
-);
-
-resetButton.addEventListener(
-  "click",
-  resetWorkspace
-);
-
-newAnalysisButton.addEventListener(
-  "click",
-  resetWorkspace
-);
-
-simulateButton.addEventListener(
-  "click",
-  runSimulation
-);
-
-collectionRate.addEventListener(
-  "input",
-  updateSimulation
-);
-
-paymentDelay.addEventListener(
-  "input",
-  updateSimulation
-);
-
-chartTabs.forEach((tab) => {
-  tab.addEventListener("click", () => {
-    renderChart(tab.dataset.chart);
+function initialiseEvents() {
+  elements.uploadDataButton?.addEventListener("click", () => {
+    elements.fileInput?.click();
   });
-});
 
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    closePrivacyModal();
-  }
-});
+  elements.fileInput?.addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
 
-/* =========================================================
-   Initialisation
-   ========================================================= */
+    if (file) {
+      readFile(file);
+    }
 
-function initialise() {
-  updatePersonalisation();
-  renderHistory();
+    event.target.value = "";
+  });
 
-  const savedPreference =
-    localStorage.getItem(STORAGE_SAVE_SETTING);
+  elements.loadSampleButton?.addEventListener(
+    "click",
+    loadSampleData
+  );
 
-  saveAnalysesToggle.checked =
-    savedPreference === "true";
+  elements.newAnalysisButton?.addEventListener(
+    "click",
+    resetApplication
+  );
 
-  if (!getUserName()) {
-    openWelcomeModal();
-  }
+  $("transactionSearch")?.addEventListener("input", () => {
+    state.currentPage = 1;
+    renderTransactions();
+  });
+
+  $("transactionTypeFilter")?.addEventListener("change", () => {
+    state.currentPage = 1;
+    renderTransactions();
+  });
+
+  $("previousPageButton")?.addEventListener("click", () => {
+    if (state.currentPage > 1) {
+      state.currentPage--;
+      renderTransactions();
+    }
+  });
+
+  $("nextPageButton")?.addEventListener("click", () => {
+    const totalPages = Math.max(
+      1,
+      Math.ceil(state.filteredRecords.length / state.pageSize)
+    );
+
+    if (state.currentPage < totalPages) {
+      state.currentPage++;
+      renderTransactions();
+    }
+  });
+
+  $("downloadCsvButton")?.addEventListener(
+    "click",
+    exportTransactions
+  );
+
+  $("exportReportButton")?.addEventListener(
+    "click",
+    exportExecutiveSummary
+  );
+
+  $("exportExecutiveReportButton")?.addEventListener(
+    "click",
+    exportExecutiveSummary
+  );
+
+  $("exportTransactionReportButton")?.addEventListener(
+    "click",
+    exportTransactions
+  );
+
+  $("exportRiskReportButton")?.addEventListener(
+    "click",
+    exportRiskRegister
+  );
+
+  $("inflowAdjustment")?.addEventListener(
+    "input",
+    updateSliderLabels
+  );
+
+  $("outflowAdjustment")?.addEventListener(
+    "input",
+    updateSliderLabels
+  );
+
+  $("scenarioMonths")?.addEventListener(
+    "change",
+    runScenario
+  );
+
+  $("runScenarioButton")?.addEventListener(
+    "click",
+    runScenario
+  );
+
+  window.addEventListener("resize", () => {
+    if (state.hasData) {
+      renderCashFlowChart();
+      renderForecastChart();
+    }
+  });
 }
 
-initialise();
+/* ----------------------------- Initialise ----------------------------- */
+
+function initialiseApplication() {
+  initialiseNavigation();
+  initialiseEvents();
+  updateSliderLabels();
+  updateDataStatus();
+  loadHistory();
+}
+
+document.addEventListener(
+  "DOMContentLoaded",
+  initialiseApplication
+);
