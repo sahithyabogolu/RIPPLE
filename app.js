@@ -271,27 +271,45 @@ function setupDragAndDrop() {
 
 // --- CSV PARSER & RECONCILIATION ENGINE ---
 function parseCSVData(rawText) {
-  const lines = rawText.split(/\r\n|\n/);
+  const lines = rawText.split(/\r\n|\n/).filter(line => line.trim() !== '');
+  if (lines.length < 2) {
+    alert("CSV file appears empty or missing data rows.");
+    return;
+  }
+
+  // Parse header row to find column indexes dynamically
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/["']/g, ''));
+  
+  const refIndex = headers.findIndex(h => h.includes('ref') || h.includes('id') || h.includes('inv') || h.includes('code'));
+  const dateIndex = headers.findIndex(h => h.includes('date') || h.includes('time'));
+  const catIndex = headers.findIndex(h => h.includes('cat') || h.includes('desc') || h.includes('category'));
+  const typeIndex = headers.findIndex(h => h.includes('type') || h.includes('flow') || h.includes('direction'));
+  const amountIndex = headers.findIndex(h => h.includes('amount') || h.includes('val') || h.includes('total') || h.includes('price'));
+
   const records = [];
 
-  lines.forEach((line, index) => {
-    if (!line.trim() || index === 0 && line.toLowerCase().includes('reference')) return; // Skip header/empty
-    const parts = line.split(',');
-    
-    if (parts.length >= 4) {
-      records.push({
-        rowId: index,
-        date: parts[0]?.trim() || 'N/A',
-        reference: parts[1]?.trim() || `REF-${index}`,
-        category: parts[2]?.trim() || 'General',
-        type: parts[3]?.trim().toLowerCase() === 'inflow' ? 'inflow' : 'outflow',
-        amount: parseFloat(parts[4]) || 0
-      });
-    }
-  });
+  for (let i = 1; i < lines.length; i++) {
+    const parts = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || lines[i].split(',');
+    if (parts.length < 2) continue;
+
+    const rawAmountStr = parts[amountIndex >= 0 ? amountIndex : 4]?.replace(/[^0-9.-]/g, '') || '0';
+    const parsedAmount = parseFloat(rawAmountStr);
+
+    const rawType = parts[typeIndex >= 0 ? typeIndex : 3]?.toLowerCase() || '';
+    const isOutflow = rawType.includes('out') || rawType.includes('debit') || rawType.includes('expense') || parsedAmount < 0;
+
+    records.push({
+      rowId: i,
+      date: parts[dateIndex >= 0 ? dateIndex : 0]?.replace(/["']/g, '').trim() || '2026-03-01',
+      reference: parts[refIndex >= 0 ? refIndex : 1]?.replace(/["']/g, '').trim() || `REF-${i}`,
+      category: parts[catIndex >= 0 ? catIndex : 2]?.replace(/["']/g, '').trim() || 'General',
+      type: isOutflow ? 'outflow' : 'inflow',
+      amount: Math.abs(parsedAmount)
+    });
+  }
 
   if (records.length === 0) {
-    alert("No valid rows found in file.");
+    alert("Could not parse valid records from CSV.");
     return;
   }
 
@@ -382,8 +400,10 @@ function updateDashboard() {
     .reduce((sum, r) => sum + r.amount, 0);
 
   const netCash = totalInflows - totalOutflows;
-  const dailyBurn = totalOutflows > 0 ? totalOutflows / 30 : 1;
-  const runwayDays = Math.max(0, Math.floor(netCash / dailyBurn));
+
+  // Calculate daily burn rate across 30 days
+  const dailyBurn = totalOutflows > 0 ? (totalOutflows / 30) : 0;
+  const runwayDays = dailyBurn > 0 ? Math.max(0, Math.floor(netCash / dailyBurn)) : (netCash > 0 ? 999 : 0);
 
   // Render Metric Cards
   document.getElementById('metric-cash').textContent = formatMoney(netCash);
@@ -391,13 +411,14 @@ function updateDashboard() {
   document.getElementById('metric-outflows').textContent = formatMoney(totalOutflows);
   
   const runwayEl = document.getElementById('metric-runway');
-  if (runwayEl) runwayEl.textContent = `${runwayDays} Days`;
+  if (runwayEl) runwayEl.textContent = runwayDays === 999 ? '∞ Days' : `${runwayDays} Days`;
 
   const runwayStatus = document.getElementById('metric-runway-status');
   if (runwayStatus) {
-    if (runwayDays > 60) runwayStatus.textContent = "Status: Healthy Runway";
-    else if (runwayDays > 30) runwayStatus.textContent = "Status: Moderate";
-    else runwayStatus.textContent = "Status: Critical Attention Needed";
+    if (netCash <= 0 && appState.resolvedRecords.length > 0) runwayStatus.textContent = "Status: Critical (Negative Cash)";
+    else if (runwayDays > 60) runwayStatus.textContent = "Status: Healthy Runway";
+    else if (runwayDays > 30) runwayStatus.textContent = "Status: Moderate Runway";
+    else runwayStatus.textContent = "Status: Idle / Attention Needed";
   }
 
   // Render Engine Throughput Stats
