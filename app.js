@@ -1,4 +1,4 @@
-const fileInput = document.getElementById("csvFile");
+const uploadInput = document.getElementById("csvFile");
 const fileName = document.getElementById("fileName");
 const statusMessage = document.getElementById("statusMessage");
 const errorMessage = document.getElementById("errorMessage");
@@ -14,12 +14,14 @@ const dataQuality = document.getElementById("dataQuality");
 const evidenceList = document.getElementById("evidenceList");
 
 const collectionRate = document.getElementById("collectionRate");
-const collectionRateValue = document.getElementById("collectionRateValue");
 const paymentDelay = document.getElementById("paymentDelay");
+const collectionRateValue = document.getElementById("collectionRateValue");
 const paymentDelayValue = document.getElementById("paymentDelayValue");
 const simulateButton = document.getElementById("simulateButton");
 const simulationResult = document.getElementById("simulationResult");
+
 const resetButton = document.getElementById("resetButton");
+const sampleButton = document.getElementById("sampleButton");
 
 let currentAnalysis = null;
 
@@ -31,25 +33,32 @@ const aliases = {
     "bill date",
     "payment date"
   ],
+
   dueDate: [
     "due date",
-    "payment due",
-    "deadline"
+    "payment due date",
+    "deadline",
+    "expected payment date"
   ],
+
   description: [
     "description",
     "details",
-    "narration",
     "particulars",
-    "transaction description"
+    "narration",
+    "transaction description",
+    "name"
   ],
+
   customer: [
     "customer",
     "customer name",
     "client",
     "client name",
-    "buyer"
+    "buyer",
+    "buyer name"
   ],
+
   supplier: [
     "supplier",
     "supplier name",
@@ -57,141 +66,236 @@ const aliases = {
     "vendor name",
     "payee"
   ],
+
   amount: [
     "amount",
-    "value",
-    "total",
     "total amount",
     "invoice amount",
-    "bill amount"
+    "bill amount",
+    "value",
+    "total"
   ],
+
   moneyIn: [
     "money in",
+    "cash inflow",
+    "inflow",
     "credit",
     "credits",
-    "inflow",
-    "inflows",
-    "receipt",
-    "receipts",
+    "received",
     "income",
     "cash received"
   ],
+
   moneyOut: [
     "money out",
+    "cash outflow",
+    "outflow",
     "debit",
     "debits",
-    "outflow",
-    "outflows",
-    "payment",
-    "payments",
+    "paid",
     "expense",
     "expenses",
     "cash paid"
   ],
+
   outstanding: [
     "outstanding",
     "outstanding amount",
     "balance due",
     "amount due",
-    "unpaid amount"
+    "unpaid amount",
+    "remaining amount"
   ],
+
   received: [
     "amount received",
-    "received",
+    "received amount",
     "amount paid",
-    "paid"
+    "paid amount",
+    "collected",
+    "collection"
   ],
-  status: [
-    "status",
-    "payment status",
-    "invoice status"
-  ],
+
   essential: [
     "essential",
-    "essential non essential",
+    "essential / non-essential",
     "priority",
     "critical",
-    "mandatory"
+    "payment priority"
   ],
+
   openingCash: [
     "opening cash",
     "opening balance",
-    "cash balance",
-    "available cash"
+    "starting cash",
+    "opening cash balance"
   ],
+
   closingCash: [
     "closing cash",
-    "closing balance"
+    "closing balance",
+    "ending cash",
+    "ending balance",
+    "cash balance"
+  ],
+
+  expectedCollections: [
+    "expected customer collections",
+    "expected collections",
+    "customer collections",
+    "expected receipts",
+    "forecast collections"
+  ],
+
+  otherInflows: [
+    "expected other inflows",
+    "other inflows",
+    "other income",
+    "other receipts"
+  ],
+
+  essentialPayments: [
+    "essential payments",
+    "essential outflows",
+    "critical payments",
+    "mandatory payments"
+  ],
+
+  nonEssentialPayments: [
+    "non-essential payments",
+    "non essential payments",
+    "discretionary payments",
+    "optional payments"
   ]
 };
 
-function normalise(value) {
-  return String(value || "")
+function cleanText(value) {
+  return String(value ?? "")
+    .trim()
     .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]/g, "");
+    .replace(/\s+/g, " ")
+    .replace(/[_-]+/g, " ");
 }
 
-function cleanText(value) {
-  return String(value ?? "").trim();
+function normaliseHeader(value) {
+  return cleanText(value)
+    .replace(/[₹$€£,%()]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function findColumn(headers, possibleNames) {
-  const normalisedHeaders = headers.map(normalise);
+  const normalisedHeaders = headers.map(normaliseHeader);
 
   for (const name of possibleNames) {
-    const index = normalisedHeaders.indexOf(normalise(name));
-    if (index !== -1) return headers[index];
+    const target = normaliseHeader(name);
+    const exactIndex = normalisedHeaders.indexOf(target);
+
+    if (exactIndex !== -1) {
+      return headers[exactIndex];
+    }
+  }
+
+  for (const name of possibleNames) {
+    const target = normaliseHeader(name);
+
+    const partialIndex = normalisedHeaders.findIndex(header =>
+      header.includes(target) || target.includes(header)
+    );
+
+    if (partialIndex !== -1) {
+      return headers[partialIndex];
+    }
   }
 
   return null;
 }
 
-function numberValue(value) {
+function getValue(row, column) {
+  if (!column) return "";
+  return row[column];
+}
+
+function parseNumber(value) {
   if (value === null || value === undefined || value === "") {
     return null;
   }
 
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
   }
 
-  const cleaned = String(value)
-    .replace(/[₹$£€,\s]/g, "")
-    .replace(/[()]/g, "-")
+  let text = String(value).trim();
+
+  if (!text) return null;
+
+  const isNegative =
+    text.includes("(") &&
+    text.includes(")");
+
+  text = text
+    .replace(/[₹$€£,\s]/g, "")
+    .replace(/[()]/g, "")
     .replace(/[^\d.-]/g, "");
 
-  const parsed = Number(cleaned);
-  return Number.isFinite(parsed) ? parsed : null;
+  if (!text || text === "-" || text === ".") {
+    return null;
+  }
+
+  const number = Number(text);
+
+  if (!Number.isFinite(number)) {
+    return null;
+  }
+
+  return isNegative ? -Math.abs(number) : number;
 }
 
-function dateValue(value) {
+function parseDate(value) {
   if (!value) return null;
 
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+  if (value instanceof Date && !isNaN(value)) {
     return value;
   }
 
   if (typeof value === "number") {
-    const excelDate = XLSX.SSF.parse_date_code(value);
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    const date = new Date(
+      excelEpoch.getTime() + value * 86400000
+    );
 
-    if (excelDate) {
-      return new Date(
-        excelDate.y,
-        excelDate.m - 1,
-        excelDate.d
-      );
+    return isNaN(date) ? null : date;
+  }
+
+  const text = String(value).trim();
+
+  const date = new Date(text);
+
+  if (!isNaN(date)) {
+    return date;
+  }
+
+  const parts = text.split(/[\/.-]/);
+
+  if (parts.length === 3) {
+    const day = Number(parts[0]);
+    const month = Number(parts[1]) - 1;
+    const year = Number(parts[2]);
+
+    const parsed = new Date(year, month, day);
+
+    if (!isNaN(parsed)) {
+      return parsed;
     }
   }
 
-  const parsed = new Date(value);
-
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  return null;
 }
 
-function formatMoney(value) {
+function formatCurrency(value) {
   if (value === null || value === undefined || !Number.isFinite(value)) {
-    return "Unavailable";
+    return "Not available";
   }
 
   return new Intl.NumberFormat("en-IN", {
@@ -204,470 +308,727 @@ function formatMoney(value) {
 function formatDate(value) {
   if (!value) return "Unknown date";
 
-  return value.toLocaleDateString("en-IN", {
+  const date = value instanceof Date ? value : parseDate(value);
+
+  if (!date) return "Unknown date";
+
+  return date.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric"
   });
 }
 
-function daysBetween(first, second) {
-  const difference = second.getTime() - first.getTime();
-  return Math.round(difference / 86400000);
-}
+function isEssential(value) {
+  const text = cleanText(value);
 
-function getRows(sheet) {
-  const rows = XLSX.utils.sheet_to_json(sheet, {
-    defval: "",
-    raw: true
-  });
+  if (
+    text.includes("non") ||
+    text.includes("optional") ||
+    text.includes("discretionary")
+  ) {
+    return false;
+  }
 
-  return rows.filter((row) =>
-    Object.values(row).some((value) => cleanText(value) !== "")
+  return (
+    text.includes("essential") ||
+    text.includes("critical") ||
+    text.includes("mandatory") ||
+    text.includes("high") ||
+    text === "yes" ||
+    text === "true"
   );
 }
 
-function classifySheet(rows) {
-  if (!rows.length) return "unknown";
+function isOverdue(row) {
+  const status = cleanText(row.status);
 
-  const headers = Object.keys(rows[0]);
-  const headerText = headers.map(normalise).join(" ");
+  if (
+    status.includes("overdue") ||
+    status.includes("late") ||
+    status.includes("past due")
+  ) {
+    return true;
+  }
 
-  const hasMoneyIn = findColumn(headers, aliases.moneyIn);
-  const hasMoneyOut = findColumn(headers, aliases.moneyOut);
-  const hasCustomer = findColumn(headers, aliases.customer);
-  const hasSupplier = findColumn(headers, aliases.supplier);
-  const hasDueDate = findColumn(headers, aliases.dueDate);
-  const hasOpeningCash = findColumn(headers, aliases.openingCash);
-  const hasClosingCash = findColumn(headers, aliases.closingCash);
-  const hasInventory = headerText.includes("inventory") ||
-    headerText.includes("unitsinstock") ||
-    headerText.includes("reorderlevel");
+  if (row.dueDate) {
+    const dueDate = parseDate(row.dueDate);
 
-  if (hasOpeningCash || hasClosingCash) return "forecast";
-  if (hasCustomer && hasDueDate) return "receivables";
-  if (hasSupplier && hasDueDate) return "payables";
-  if (hasMoneyIn || hasMoneyOut) return "transactions";
-  if (hasInventory) return "inventory";
+    if (dueDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      return dueDate < today && (row.outstanding ?? 0) > 0;
+    }
+  }
+
+  return false;
+}
+
+function classifySheet(headers, rows) {
+  const headerText = headers.map(normaliseHeader).join(" ");
+
+  if (
+    headerText.includes("opening cash") ||
+    headerText.includes("closing cash") ||
+    headerText.includes("cash risk") ||
+    headerText.includes("expected customer collections")
+  ) {
+    return "forecast";
+  }
+
+  if (
+    headerText.includes("invoice") ||
+    headerText.includes("customer") ||
+    headerText.includes("amount received") ||
+    headerText.includes("invoice amount")
+  ) {
+    return "receivables";
+  }
+
+  if (
+    headerText.includes("bill number") ||
+    headerText.includes("supplier") ||
+    headerText.includes("bill amount") ||
+    headerText.includes("amount paid")
+  ) {
+    return "payables";
+  }
+
+  if (
+    headerText.includes("money in") ||
+    headerText.includes("money out") ||
+    headerText.includes("transaction id") ||
+    headerText.includes("transaction date")
+  ) {
+    return "transactions";
+  }
+
+  if (
+    headerText.includes("units in stock") ||
+    headerText.includes("inventory value") ||
+    headerText.includes("reorder level")
+  ) {
+    return "inventory";
+  }
+
+  const firstRows = rows
+    .slice(0, 5)
+    .map(row => Object.values(row).join(" ").toLowerCase())
+    .join(" ");
+
+  if (
+    firstRows.includes("invoice") &&
+    firstRows.includes("customer")
+  ) {
+    return "receivables";
+  }
+
+  if (
+    firstRows.includes("supplier") &&
+    firstRows.includes("bill")
+  ) {
+    return "payables";
+  }
 
   return "unknown";
 }
 
-function normaliseTransactions(rows) {
-  const headers = Object.keys(rows[0] || {});
+function normaliseTransactions(headers, rows) {
   const dateColumn = findColumn(headers, aliases.date);
   const descriptionColumn = findColumn(headers, aliases.description);
   const moneyInColumn = findColumn(headers, aliases.moneyIn);
   const moneyOutColumn = findColumn(headers, aliases.moneyOut);
   const amountColumn = findColumn(headers, aliases.amount);
 
-  return rows.map((row) => {
-    let inflow = moneyInColumn
-      ? numberValue(row[moneyInColumn])
-      : null;
-
-    let outflow = moneyOutColumn
-      ? numberValue(row[moneyOutColumn])
-      : null;
-
-    if (!moneyInColumn && !moneyOutColumn && amountColumn) {
-      const description = cleanText(row[descriptionColumn]).toLowerCase();
+  return rows
+    .map(row => {
+      let moneyIn = parseNumber(getValue(row, moneyInColumn));
+      let moneyOut = parseNumber(getValue(row, moneyOutColumn));
 
       if (
-        description.includes("sale") ||
-        description.includes("receipt") ||
-        description.includes("income") ||
-        description.includes("deposit")
+        moneyIn === null &&
+        moneyOut === null &&
+        amountColumn
       ) {
-        inflow = numberValue(row[amountColumn]);
-        outflow = 0;
-      } else if (
-        description.includes("payment") ||
-        description.includes("expense") ||
-        description.includes("purchase") ||
-        description.includes("withdraw")
-      ) {
-        inflow = 0;
-        outflow = numberValue(row[amountColumn]);
+        const amount = parseNumber(getValue(row, amountColumn));
+        const description = cleanText(
+          getValue(row, descriptionColumn)
+        );
+
+        if (
+          description.includes("sale") ||
+          description.includes("receipt") ||
+          description.includes("income") ||
+          description.includes("collection") ||
+          description.includes("credit")
+        ) {
+          moneyIn = amount;
+          moneyOut = 0;
+        } else if (amount !== null) {
+          moneyIn = 0;
+          moneyOut = amount;
+        }
       }
-    }
 
-    return {
-      date: dateValue(row[dateColumn]),
-      description: cleanText(row[descriptionColumn]),
-      inflow: inflow ?? 0,
-      outflow: outflow ?? 0
-    };
-  });
+      return {
+        date: parseDate(getValue(row, dateColumn)),
+        description: getValue(row, descriptionColumn),
+        moneyIn: moneyIn ?? 0,
+        moneyOut: moneyOut ?? 0
+      };
+    })
+    .filter(row =>
+      row.moneyIn !== 0 ||
+      row.moneyOut !== 0 ||
+      row.date
+    );
 }
 
-function normaliseReceivables(rows) {
-  const headers = Object.keys(rows[0] || {});
+function normaliseReceivables(headers, rows) {
   const customerColumn = findColumn(headers, aliases.customer);
+  const dateColumn = findColumn(headers, aliases.date);
   const dueDateColumn = findColumn(headers, aliases.dueDate);
-  const amountColumn = findColumn(headers, aliases.amount);
-  const outstandingColumn = findColumn(headers, aliases.outstanding);
+  const amountColumn = findColumn(headers, [
+    "invoice amount",
+    "total invoice amount",
+    "amount"
+  ]);
   const receivedColumn = findColumn(headers, aliases.received);
-  const statusColumn = findColumn(headers, aliases.status);
+  const outstandingColumn = findColumn(headers, aliases.outstanding);
+  const statusColumn = findColumn(headers, [
+    "payment status",
+    "status"
+  ]);
+  const priorityColumn = findColumn(headers, [
+    "customer priority",
+    "priority"
+  ]);
 
-  return rows.map((row) => {
-    const amount = numberValue(row[amountColumn]);
-    const outstanding = outstandingColumn
-      ? numberValue(row[outstandingColumn])
-      : null;
+  return rows
+    .map(row => {
+      const amount = parseNumber(getValue(row, amountColumn));
+      const received = parseNumber(getValue(row, receivedColumn));
+      let outstanding = parseNumber(
+        getValue(row, outstandingColumn)
+      );
 
-    const received = receivedColumn
-      ? numberValue(row[receivedColumn])
-      : null;
+      if (outstanding === null && amount !== null) {
+        outstanding = Math.max(
+          amount - (received ?? 0),
+          0
+        );
+      }
 
-    return {
-      customer: cleanText(row[customerColumn]) || "Unnamed customer",
-      dueDate: dateValue(row[dueDateColumn]),
-      amount,
-      outstanding:
-        outstanding !== null
-          ? outstanding
-          : amount !== null && received !== null
-            ? Math.max(amount - received, 0)
-            : amount,
-      status: cleanText(row[statusColumn])
-    };
-  });
+      return {
+        customer: getValue(row, customerColumn) || "Unnamed customer",
+        date: parseDate(getValue(row, dateColumn)),
+        dueDate: parseDate(getValue(row, dueDateColumn)),
+        amount: amount ?? 0,
+        received: received ?? 0,
+        outstanding: outstanding ?? 0,
+        status: getValue(row, statusColumn),
+        priority: getValue(row, priorityColumn)
+      };
+    })
+    .filter(row =>
+      row.outstanding > 0 ||
+      row.amount > 0 ||
+      row.customer !== "Unnamed customer"
+    );
 }
 
-function normalisePayables(rows) {
-  const headers = Object.keys(rows[0] || {});
+function normalisePayables(headers, rows) {
   const supplierColumn = findColumn(headers, aliases.supplier);
+  const dateColumn = findColumn(headers, aliases.date);
   const dueDateColumn = findColumn(headers, aliases.dueDate);
-  const amountColumn = findColumn(headers, aliases.amount);
-  const outstandingColumn = findColumn(headers, aliases.outstanding);
+  const amountColumn = findColumn(headers, [
+    "bill amount",
+    "total bill amount",
+    "amount"
+  ]);
   const paidColumn = findColumn(headers, aliases.received);
+  const outstandingColumn = findColumn(headers, aliases.outstanding);
+  const statusColumn = findColumn(headers, [
+    "payment status",
+    "status"
+  ]);
   const essentialColumn = findColumn(headers, aliases.essential);
 
-  return rows.map((row) => {
-    const amount = numberValue(row[amountColumn]);
-    const outstanding = outstandingColumn
-      ? numberValue(row[outstandingColumn])
-      : null;
+  return rows
+    .map(row => {
+      const amount = parseNumber(getValue(row, amountColumn));
+      const paid = parseNumber(getValue(row, paidColumn));
 
-    const paid = paidColumn
-      ? numberValue(row[paidColumn])
-      : null;
+      let outstanding = parseNumber(
+        getValue(row, outstandingColumn)
+      );
 
-    return {
-      supplier: cleanText(row[supplierColumn]) || "Unnamed supplier",
-      dueDate: dateValue(row[dueDateColumn]),
-      amount,
-      outstanding:
-        outstanding !== null
-          ? outstanding
-          : amount !== null && paid !== null
-            ? Math.max(amount - paid, 0)
-            : amount,
-      essential: cleanText(row[essentialColumn]).toLowerCase()
-    };
-  });
+      if (outstanding === null && amount !== null) {
+        outstanding = Math.max(
+          amount - (paid ?? 0),
+          0
+        );
+      }
+
+      return {
+        supplier: getValue(row, supplierColumn) || "Unnamed supplier",
+        date: parseDate(getValue(row, dateColumn)),
+        dueDate: parseDate(getValue(row, dueDateColumn)),
+        amount: amount ?? 0,
+        paid: paid ?? 0,
+        outstanding: outstanding ?? 0,
+        status: getValue(row, statusColumn),
+        essential: isEssential(
+          getValue(row, essentialColumn)
+        )
+      };
+    })
+    .filter(row =>
+      row.outstanding > 0 ||
+      row.amount > 0 ||
+      row.supplier !== "Unnamed supplier"
+    );
 }
 
-function normaliseForecast(rows) {
-  const headers = Object.keys(rows[0] || {});
+function normaliseForecast(headers, rows) {
   const dateColumn = findColumn(headers, aliases.date);
   const openingColumn = findColumn(headers, aliases.openingCash);
-  const customerColumn = findColumn(headers, aliases.moneyIn);
+  const collectionsColumn = findColumn(
+    headers,
+    aliases.expectedCollections
+  );
+  const otherInflowsColumn = findColumn(
+    headers,
+    aliases.otherInflows
+  );
+  const essentialPaymentsColumn = findColumn(
+    headers,
+    aliases.essentialPayments
+  );
+  const nonEssentialPaymentsColumn = findColumn(
+    headers,
+    aliases.nonEssentialPayments
+  );
   const closingColumn = findColumn(headers, aliases.closingCash);
 
-  return rows.map((row) => ({
-    date: dateValue(row[dateColumn]),
-    openingCash: numberValue(row[openingColumn]),
-    customerCollections: numberValue(row[customerColumn]) || 0,
-    closingCash: numberValue(row[closingColumn])
-  }));
+  return rows
+    .map(row => ({
+      date: parseDate(getValue(row, dateColumn)),
+      openingCash: parseNumber(
+        getValue(row, openingColumn)
+      ),
+      expectedCollections: parseNumber(
+        getValue(row, collectionsColumn)
+      ) ?? 0,
+      otherInflows: parseNumber(
+        getValue(row, otherInflowsColumn)
+      ) ?? 0,
+      essentialPayments: parseNumber(
+        getValue(row, essentialPaymentsColumn)
+      ) ?? 0,
+      nonEssentialPayments: parseNumber(
+        getValue(row, nonEssentialPaymentsColumn)
+      ) ?? 0,
+      closingCash: parseNumber(
+        getValue(row, closingColumn)
+      )
+    }))
+    .filter(row =>
+      row.date ||
+      row.openingCash !== null ||
+      row.closingCash !== null
+    )
+    .sort((a, b) => {
+      if (!a.date || !b.date) return 0;
+      return a.date - b.date;
+    });
 }
 
-function analyseWorkbook(workbook) {
-  const analysis = {
+function inspectWorkbook(workbook) {
+  const result = {
     transactions: [],
     receivables: [],
     payables: [],
     forecast: [],
-    sheetsReviewed: 0,
-    recordsDetected: 0,
-    warnings: []
+    inventory: [],
+    unknownSheets: [],
+    warnings: [],
+    sheetCount: workbook.SheetNames.length
   };
 
-  workbook.SheetNames.forEach((sheetName) => {
+  workbook.SheetNames.forEach(sheetName => {
     const sheet = workbook.Sheets[sheetName];
-    const rows = getRows(sheet);
 
-    if (!rows.length) return;
+    const rows = XLSX.utils.sheet_to_json(sheet, {
+      defval: "",
+      raw: true
+    });
 
-    analysis.sheetsReviewed += 1;
-    analysis.recordsDetected += rows.length;
+    if (!rows.length) {
+      result.warnings.push(
+        `${sheetName}: empty sheet ignored.`
+      );
+      return;
+    }
 
-    const type = classifySheet(rows);
+    const headers = Object.keys(rows[0]);
+    const type = classifySheet(headers, rows);
 
     if (type === "transactions") {
-      analysis.transactions.push(...normaliseTransactions(rows));
-    } else if (type === "receivables") {
-      analysis.receivables.push(...normaliseReceivables(rows));
-    } else if (type === "payables") {
-      analysis.payables.push(...normalisePayables(rows));
-    } else if (type === "forecast") {
-      analysis.forecast.push(...normaliseForecast(rows));
-    } else if (type === "unknown") {
-      analysis.warnings.push(
-        `The sheet "${sheetName}" was reviewed but its purpose could not be confidently identified.`
+      result.transactions.push(
+        ...normaliseTransactions(headers, rows)
       );
+    } else if (type === "receivables") {
+      result.receivables.push(
+        ...normaliseReceivables(headers, rows)
+      );
+    } else if (type === "payables") {
+      result.payables.push(
+        ...normalisePayables(headers, rows)
+      );
+    } else if (type === "forecast") {
+      result.forecast.push(
+        ...normaliseForecast(headers, rows)
+      );
+    } else if (type === "inventory") {
+      result.inventory.push(...rows);
+    } else {
+      result.unknownSheets.push(sheetName);
     }
   });
 
-  return analysis;
+  if (!result.transactions.length) {
+    result.warnings.push(
+      "No transaction sheet was confidently identified."
+    );
+  }
+
+  if (!result.receivables.length) {
+    result.warnings.push(
+      "No receivables data was confidently identified."
+    );
+  }
+
+  if (!result.payables.length) {
+    result.warnings.push(
+      "No payables data was confidently identified."
+    );
+  }
+
+  if (!result.forecast.length) {
+    result.warnings.push(
+      "No seven-day forecast was identified. Cash was estimated from available transactions."
+    );
+  }
+
+  return result;
 }
 
-function calculateAnalysis(analysis) {
-  const validTransactions = analysis.transactions.filter(
-    (item) => item.inflow !== 0 || item.outflow !== 0
-  );
-
-  const totalIn = validTransactions.reduce(
-    (sum, item) => sum + item.inflow,
+function calculateAnalysis(data) {
+  const totalInflow = data.transactions.reduce(
+    (sum, row) => sum + row.moneyIn,
     0
   );
 
-  const totalOut = validTransactions.reduce(
-    (sum, item) => sum + item.outflow,
+  const totalOutflow = data.transactions.reduce(
+    (sum, row) => sum + row.moneyOut,
     0
   );
 
-  const receivables = analysis.receivables.reduce(
-    (sum, item) => sum + (item.outstanding || 0),
+  const latestForecast =
+    data.forecast.length
+      ? data.forecast[data.forecast.length - 1]
+      : null;
+
+  const forecastCash = latestForecast
+    ? latestForecast.closingCash
+    : null;
+
+  const estimatedCash =
+    forecastCash !== null
+      ? forecastCash
+      : totalInflow - totalOutflow;
+
+  const totalReceivables = data.receivables.reduce(
+    (sum, row) => sum + row.outstanding,
     0
   );
 
-  const payables = analysis.payables.reduce(
-    (sum, item) => sum + (item.outstanding || 0),
+  const totalPayables = data.payables.reduce(
+    (sum, row) => sum + row.outstanding,
     0
   );
 
-  const overdueReceivables = analysis.receivables.filter(
-    (item) => item.dueDate && item.dueDate < new Date()
-  );
+  const overdueReceivables = data.receivables
+    .filter(isOverdue)
+    .reduce((sum, row) => sum + row.outstanding, 0);
 
-  const overdueAmount = overdueReceivables.reduce(
-    (sum, item) => sum + (item.outstanding || 0),
-    0
-  );
+  const essentialPayables = data.payables
+    .filter(row => row.essential)
+    .reduce((sum, row) => sum + row.outstanding, 0);
 
-  const essentialPayables = analysis.payables.filter(
-    (item) =>
-      item.essential.includes("essential") ||
-      item.essential.includes("critical") ||
-      item.essential.includes("mandatory")
-  );
+  const nonEssentialPayables = data.payables
+    .filter(row => !row.essential)
+    .reduce((sum, row) => sum + row.outstanding, 0);
 
-  const essentialAmount = essentialPayables.reduce(
-    (sum, item) => sum + (item.outstanding || 0),
-    0
-  );
+  const forecastMinimumCash = data.forecast.length
+    ? Math.min(
+        ...data.forecast
+          .map(row => row.closingCash)
+          .filter(value => value !== null)
+      )
+    : estimatedCash;
 
-  let cash = null;
+  let riskScore = 0;
 
-  if (analysis.forecast.length) {
-    const latest = [...analysis.forecast]
-      .filter((item) => item.closingCash !== null)
-      .sort((a, b) => {
-        if (!a.date || !b.date) return 0;
-        return b.date - a.date;
-      })[0];
+  if (estimatedCash < 0) riskScore += 45;
+  else if (estimatedCash < essentialPayables) riskScore += 30;
+  else if (estimatedCash < essentialPayables * 1.5) riskScore += 15;
 
-    cash = latest ? latest.closingCash : null;
+  if (overdueReceivables > 0) riskScore += 20;
+
+  if (forecastMinimumCash < 0) riskScore += 25;
+  else if (forecastMinimumCash < essentialPayables) riskScore += 15;
+
+  if (totalPayables > estimatedCash) riskScore += 15;
+
+  let riskLevel = "Low";
+
+  if (riskScore >= 60) {
+    riskLevel = "High";
+  } else if (riskScore >= 30) {
+    riskLevel = "Medium";
   }
-
-  if (cash === null && validTransactions.length) {
-    cash = totalIn - totalOut;
-  }
-
-  const riskScore =
-    (cash !== null && essentialAmount > cash ? 45 : 0) +
-    (overdueAmount > 0 ? 25 : 0) +
-    (cash !== null && cash < 0 ? 30 : 0);
-
-  let risk = "Low";
-
-  if (riskScore >= 60) risk = "High";
-  else if (riskScore >= 25) risk = "Medium";
 
   return {
-    ...analysis,
-    cash,
-    totalIn,
-    totalOut,
-    receivables,
-    payables,
-    overdueAmount,
-    essentialAmount,
-    risk,
-    riskScore
+    ...data,
+    estimatedCash,
+    totalInflow,
+    totalOutflow,
+    totalReceivables,
+    totalPayables,
+    overdueReceivables,
+    essentialPayables,
+    nonEssentialPayables,
+    forecastMinimumCash,
+    riskScore,
+    riskLevel
   };
 }
 
-function renderAnalysis(result) {
-  currentAnalysis = result;
-
-  dashboard.classList.remove("hidden");
-
-  cashValue.textContent = formatMoney(result.cash);
-  receivablesValue.textContent = formatMoney(result.receivables);
-  billsValue.textContent = formatMoney(result.payables);
-
-  const riskClass =
-    result.risk === "High"
-      ? "red"
-      : result.risk === "Medium"
-        ? "yellow"
-        : "green";
-
-  riskSummary.innerHTML = `
-    <div class="action-item ${riskClass}">
-      <div>
-        <div class="action-title">${result.risk} cash-flow risk</div>
-        <div class="action-description">
-          Risk score: ${result.riskScore}/100.
-          ${result.cash === null
-            ? "Available cash could not be confidently detected."
-            : `Detected cash position: ${formatMoney(result.cash)}.`}
-          ${result.essentialAmount > 0
-            ? ` Essential outstanding payments: ${formatMoney(result.essentialAmount)}.`
-            : ""}
-        </div>
-      </div>
-    </div>
-  `;
-
-  dataQuality.innerHTML = `
-    <div class="action-item">
-      <div>
-        <div class="action-title">${result.sheetsReviewed} financial sheet(s) reviewed</div>
-        <div class="action-description">
-          ${result.recordsDetected} record(s) detected.
-          Transactions: ${result.transactions.length}.
-          Receivables: ${result.receivables.length}.
-          Payables: ${result.payables.length}.
-          Forecast rows: ${result.forecast.length}.
-        </div>
-      </div>
-    </div>
-    ${
-      result.warnings.length
-        ? result.warnings
-            .map(
-              (warning) => `
-                <div class="action-item yellow">
-                  <div>
-                    <div class="action-title">Review needed</div>
-                    <div class="action-description">${warning}</div>
-                  </div>
-                </div>
-              `
-            )
-            .join("")
-        : `
-          <div class="action-item green">
-            <div>
-              <div class="action-title">No major classification warnings</div>
-              <div class="action-description">
-                RIPPLE identified the main financial data categories.
-              </div>
-            </div>
-          </div>
-        `
-    }
-  `;
-
+function createActions(analysis) {
   const actions = [];
 
-  if (result.overdueAmount > 0) {
+  if (analysis.overdueReceivables > 0) {
+    const largestOverdue = [...analysis.receivables]
+      .filter(isOverdue)
+      .sort((a, b) => b.outstanding - a.outstanding)[0];
+
     actions.push({
-      type: "red",
-      title: "Follow up on overdue customer collections",
-      description: `${formatMoney(result.overdueAmount)} is overdue. Prioritise the largest or most critical customers first.`
+      title: "Prioritise overdue collections",
+      description:
+        `Follow up on overdue customer balances, starting with ${largestOverdue?.customer || "the largest overdue account"}.`,
+      value: formatCurrency(analysis.overdueReceivables),
+      type: "urgent"
     });
   }
 
-  if (result.essentialAmount > 0 && result.cash !== null) {
+  if (
+    analysis.estimatedCash < analysis.essentialPayables ||
+    analysis.forecastMinimumCash < analysis.essentialPayables
+  ) {
     actions.push({
-      type: result.essentialAmount > result.cash ? "red" : "yellow",
-      title: "Review essential payments before committing cash",
-      description: `Essential outstanding payments total ${formatMoney(result.essentialAmount)} against detected cash of ${formatMoney(result.cash)}.`
+      title: "Protect essential payment coverage",
+      description:
+        "Review upcoming mandatory payments and confirm which obligations must be paid first.",
+      value: formatCurrency(analysis.essentialPayables),
+      type: "urgent"
     });
   }
 
-  if (result.receivables > 0) {
+  if (analysis.nonEssentialPayables > 0) {
     actions.push({
-      type: "yellow",
-      title: "Convert receivables into a dated collection plan",
-      description: `There is ${formatMoney(result.receivables)} in outstanding customer money. Separate overdue amounts from amounts not yet due.`
+      title: "Defer discretionary outflows",
+      description:
+        "Consider delaying non-essential payments until collections improve.",
+      value: formatCurrency(analysis.nonEssentialPayables),
+      type: "watch"
     });
   }
 
-  if (result.payables > 0) {
+  if (analysis.totalReceivables > 0) {
     actions.push({
-      type: "yellow",
-      title: "Sequence supplier payments by urgency",
-      description: `Outstanding obligations total ${formatMoney(result.payables)}. Protect essential payments and delay non-essential commitments where possible.`
+      title: "Create a collection schedule",
+      description:
+        "Map expected customer receipts against payment due dates instead of relying only on total balances.",
+      value: formatCurrency(analysis.totalReceivables),
+      type: "recommended"
     });
   }
 
   if (!actions.length) {
     actions.push({
-      type: "green",
-      title: "Upload more complete financial data",
-      description: "RIPPLE needs transactions, receivables, payables, or forecast data to produce stronger recommendations."
+      title: "Maintain current controls",
+      description:
+        "The available data does not show an immediate liquidity exception. Continue monitoring cash timing.",
+      value: "Monitor",
+      type: "recommended"
     });
   }
 
-  actionsList.innerHTML = actions
-    .map(
-      (action) => `
-        <div class="action-item ${action.type}">
-          <div>
-            <div class="action-title">${action.title}</div>
-            <div class="action-description">${action.description}</div>
-          </div>
-        </div>
-      `
-    )
-    .join("");
-
-  evidenceList.innerHTML = `
-    <div class="action-item">
-      <div>
-        <div class="action-title">Evidence used</div>
-        <div class="action-description">
-          Cash: ${formatMoney(result.cash)} |
-          Receivables: ${formatMoney(result.receivables)} |
-          Obligations: ${formatMoney(result.payables)} |
-          Overdue receivables: ${formatMoney(result.overdueAmount)} |
-          Essential payments: ${formatMoney(result.essentialAmount)}
-        </div>
-      </div>
-    </div>
-  `;
-
-  simulationResult.textContent =
-    "Adjust the controls and run a simulation.";
+  return actions;
 }
 
-async function handleFileUpload(event) {
-  const file = event.target.files[0];
+function createEvidence(analysis) {
+  const evidence = [];
 
+  if (analysis.forecast.length) {
+    evidence.push(
+      `Seven-day forecast minimum closing cash: ${formatCurrency(
+        analysis.forecastMinimumCash
+      )}.`
+    );
+  }
+
+  if (analysis.overdueReceivables > 0) {
+    evidence.push(
+      `Overdue receivables identified: ${formatCurrency(
+        analysis.overdueReceivables
+      )}.`
+    );
+  }
+
+  if (analysis.essentialPayables > 0) {
+    evidence.push(
+      `Essential outstanding payables: ${formatCurrency(
+        analysis.essentialPayables
+      )}.`
+    );
+  }
+
+  if (analysis.nonEssentialPayables > 0) {
+    evidence.push(
+      `Non-essential outstanding payables: ${formatCurrency(
+        analysis.nonEssentialPayables
+      )}.`
+    );
+  }
+
+  evidence.push(
+    `Transactions analysed: ${analysis.transactions.length}.`
+  );
+
+  evidence.push(
+    `Receivable records analysed: ${analysis.receivables.length}.`
+  );
+
+  evidence.push(
+    `Payable records analysed: ${analysis.payables.length}.`
+  );
+
+  return evidence;
+}
+
+function renderAnalysis(analysis) {
+  currentAnalysis = analysis;
+
+  dashboard.classList.remove("hidden");
+
+  cashValue.textContent = formatCurrency(
+    analysis.estimatedCash
+  );
+
+  receivablesValue.textContent = formatCurrency(
+    analysis.totalReceivables
+  );
+
+  billsValue.textContent = formatCurrency(
+    analysis.totalPayables
+  );
+
+  riskSummary.innerHTML = `
+    <div class="risk-card risk-${analysis.riskLevel.toLowerCase()}">
+      <div>
+        <span class="risk-label">Liquidity risk</span>
+        <strong>${analysis.riskLevel}</strong>
+      </div>
+      <div class="risk-score">
+        Score ${analysis.riskScore}/100
+      </div>
+    </div>
+    <p>
+      Minimum forecast cash is
+      <strong>${formatCurrency(analysis.forecastMinimumCash)}</strong>.
+      Essential outstanding payments total
+      <strong>${formatCurrency(analysis.essentialPayables)}</strong>.
+    </p>
+  `;
+
+  const actions = createActions(analysis);
+
+  actionsList.innerHTML = actions
+    .map(action => `
+      <div class="action-item action-${action.type}">
+        <div class="action-topline">
+          <span class="action-type">${action.type}</span>
+          <strong>${action.value}</strong>
+        </div>
+        <h3>${action.title}</h3>
+        <p>${action.description}</p>
+      </div>
+    `)
+    .join("");
+
+  const warnings = analysis.warnings.length
+    ? analysis.warnings
+        .map(warning => `<li>${warning}</li>`)
+        .join("")
+    : "<li>No major data-quality warnings detected.</li>";
+
+  dataQuality.innerHTML = `
+    <div class="quality-summary">
+      <strong>${analysis.sheetCount}</strong>
+      <span>Sheets scanned</span>
+    </div>
+    <div class="quality-summary">
+      <strong>${analysis.transactions.length}</strong>
+      <span>Transactions</span>
+    </div>
+    <div class="quality-summary">
+      <strong>${analysis.receivables.length}</strong>
+      <span>Receivable records</span>
+    </div>
+    <div class="quality-summary">
+      <strong>${analysis.payables.length}</strong>
+      <span>Payable records</span>
+    </div>
+    <ul class="warning-list">${warnings}</ul>
+  `;
+
+  evidenceList.innerHTML = createEvidence(analysis)
+    .map(item => `<li>${item}</li>`)
+    .join("");
+
+  statusMessage.textContent =
+    "Analysis complete. Review the evidence before acting.";
+
+  errorMessage.textContent = "";
+}
+
+function showError(message) {
+  errorMessage.textContent = message;
+  statusMessage.textContent = "";
+}
+
+async function processFile(file) {
   if (!file) return;
 
-  fileName.textContent = file.name;
-  statusMessage.textContent = "Reading and analysing your financial data...";
-  errorMessage.textContent = "";
-
   try {
+    errorMessage.textContent = "";
+    statusMessage.textContent = "Reading and understanding your file...";
+    fileName.textContent = file.name;
+
     const buffer = await file.arrayBuffer();
 
     const workbook = XLSX.read(buffer, {
@@ -675,81 +1036,247 @@ async function handleFileUpload(event) {
       cellDates: true
     });
 
-    const rawAnalysis = analyseWorkbook(workbook);
-    const result = calculateAnalysis(rawAnalysis);
+    const data = inspectWorkbook(workbook);
+    const analysis = calculateAnalysis(data);
 
-    renderAnalysis(result);
-
-    statusMessage.textContent = "Analysis complete.";
+    renderAnalysis(analysis);
   } catch (error) {
     console.error(error);
-    errorMessage.textContent =
-      "RIPPLE could not read this file. Please check that it is a valid Excel or CSV file.";
-    statusMessage.textContent = "";
+
+    showError(
+      "The file could not be analysed. Please check that it is a valid Excel or CSV file."
+    );
   }
+}
+
+function createSampleWorkbook() {
+  return {
+    transactions: [
+      {
+        date: new Date("2026-09-05"),
+        description: "Customer collection",
+        moneyIn: 45000,
+        moneyOut: 0
+      },
+      {
+        date: new Date("2026-09-05"),
+        description: "Other income",
+        moneyIn: 18000,
+        moneyOut: 0
+      },
+      {
+        date: new Date("2026-09-06"),
+        description: "Supplier payment",
+        moneyIn: 0,
+        moneyOut: 69000
+      },
+      {
+        date: new Date("2026-09-07"),
+        description: "Essential supplier payment",
+        moneyIn: 0,
+        moneyOut: 257700
+      }
+    ],
+
+    receivables: [
+      {
+        customer: "Urban Nest Retail",
+        date: new Date("2026-08-01"),
+        dueDate: new Date("2026-08-25"),
+        amount: 125000,
+        received: 0,
+        outstanding: 125000,
+        status: "Overdue",
+        priority: "High"
+      },
+      {
+        customer: "The Home Story",
+        date: new Date("2026-08-10"),
+        dueDate: new Date("2026-09-10"),
+        amount: 68000,
+        received: 0,
+        outstanding: 68000,
+        status: "Not Due",
+        priority: "Medium"
+      },
+      {
+        customer: "Casa Bella Interiors",
+        date: new Date("2026-08-05"),
+        dueDate: new Date("2026-08-28"),
+        amount: 106000,
+        received: 0,
+        outstanding: 106000,
+        status: "Overdue",
+        priority: "High"
+      }
+    ],
+
+    payables: [
+      {
+        supplier: "Jaipur Blue Pottery Works",
+        date: new Date("2026-08-20"),
+        dueDate: new Date("2026-09-07"),
+        amount: 145000,
+        paid: 0,
+        outstanding: 145000,
+        status: "Due Soon",
+        essential: true
+      },
+      {
+        supplier: "BESCOM",
+        date: new Date("2026-08-20"),
+        dueDate: new Date("2026-09-08"),
+        amount: 16800,
+        paid: 0,
+        outstanding: 16800,
+        status: "Due Soon",
+        essential: true
+      },
+      {
+        supplier: "Meta Platforms",
+        date: new Date("2026-08-20"),
+        dueDate: new Date("2026-09-07"),
+        amount: 22000,
+        paid: 0,
+        outstanding: 22000,
+        status: "Due Soon",
+        essential: false
+      }
+    ],
+
+    forecast: [
+      {
+        date: new Date("2026-09-05"),
+        openingCash: 301298.7,
+        expectedCollections: 45000,
+        otherInflows: 18000,
+        essentialPayments: 69000,
+        nonEssentialPayments: 0,
+        closingCash: 295298.7
+      },
+      {
+        date: new Date("2026-09-07"),
+        openingCash: 278898.7,
+        expectedCollections: 0,
+        otherInflows: 8000,
+        essentialPayments: 257700,
+        nonEssentialPayments: 22000,
+        closingCash: 7198.7
+      },
+      {
+        date: new Date("2026-09-08"),
+        openingCash: 7198.7,
+        expectedCollections: 125000,
+        otherInflows: 20000,
+        essentialPayments: 16800,
+        nonEssentialPayments: 0,
+        closingCash: 135398.7
+      }
+    ],
+
+    inventory: [],
+    unknownSheets: [],
+    warnings: [],
+    sheetCount: 5
+  };
+}
+
+function loadSampleData() {
+  const sample = createSampleWorkbook();
+  const analysis = calculateAnalysis(sample);
+
+  fileName.textContent = "RIPPLE sample workspace";
+  renderAnalysis(analysis);
 }
 
 function runSimulation() {
   if (!currentAnalysis) {
     simulationResult.textContent =
-      "Upload and analyse a file before running a simulation.";
+      "Upload a file or load the sample workspace first.";
     return;
   }
 
-  const rate = Number(collectionRate.value) / 100;
-  const delay = Number(paymentDelay.value);
+  const collectionMultiplier =
+    Number(collectionRate.value) / 100;
 
-  const expectedCollections = currentAnalysis.receivables * rate;
+  const delayDays = Number(paymentDelay.value);
 
-  const delayedPayments = currentAnalysis.payables * 0.5;
-  const adjustedPayments =
-    delay > 0 ? delayedPayments * 0.5 : delayedPayments;
+  const baseCash = currentAnalysis.estimatedCash;
+
+  const additionalCollections =
+    currentAnalysis.totalReceivables *
+    collectionMultiplier;
+
+  const delayedPayments =
+    currentAnalysis.nonEssentialPayables *
+    Math.min(delayDays / 30, 1);
 
   const simulatedCash =
-    (currentAnalysis.cash || 0) +
-    expectedCollections -
-    adjustedPayments;
+    baseCash +
+    additionalCollections +
+    delayedPayments;
 
-  const resultClass =
-    simulatedCash < 0
-      ? "red"
-      : simulatedCash < currentAnalysis.essentialAmount
-        ? "yellow"
-        : "green";
+  const improvement =
+    simulatedCash - baseCash;
 
   simulationResult.innerHTML = `
-    <div class="action-item ${resultClass}">
-      <div>
-        <div class="action-title">
-          Simulated closing cash: ${formatMoney(simulatedCash)}
-        </div>
-        <div class="action-description">
-          Assumes ${Math.round(rate * 100)}% of outstanding receivables are
-          collected and payments are delayed by ${delay} day(s).
-          This is a directional scenario, not a guaranteed forecast.
-        </div>
-      </div>
+    <div class="simulation-number">
+      ${formatCurrency(simulatedCash)}
     </div>
+    <p>
+      Estimated cash after collecting
+      <strong>${collectionRate.value}%</strong>
+      of outstanding receivables and delaying selected payments by
+      <strong>${delayDays} days</strong>.
+    </p>
+    <p class="simulation-improvement">
+      Potential cash improvement:
+      <strong>${formatCurrency(improvement)}</strong>
+    </p>
+    <small>
+      This is a scenario estimate, not a guaranteed outcome.
+    </small>
   `;
 }
 
-collectionRate.addEventListener("input", () => {
-  collectionRateValue.textContent = `${collectionRate.value}%`;
-});
+if (uploadInput) {
+  uploadInput.addEventListener("change", event => {
+    const file = event.target.files[0];
+    processFile(file);
+  });
+}
 
-paymentDelay.addEventListener("input", () => {
-  paymentDelayValue.textContent =
-    `${paymentDelay.value} day${paymentDelay.value === "1" ? "" : "s"}`;
-});
+if (sampleButton) {
+  sampleButton.addEventListener("click", loadSampleData);
+}
 
-fileInput.addEventListener("change", handleFileUpload);
-simulateButton.addEventListener("click", runSimulation);
+if (simulateButton) {
+  simulateButton.addEventListener("click", runSimulation);
+}
 
-resetButton.addEventListener("click", () => {
-  fileInput.value = "";
-  fileName.textContent = "No file selected";
-  statusMessage.textContent = "";
-  errorMessage.textContent = "";
-  dashboard.classList.add("hidden");
-  currentAnalysis = null;
-});
+if (collectionRate) {
+  collectionRate.addEventListener("input", () => {
+    collectionRateValue.textContent =
+      `${collectionRate.value}%`;
+  });
+}
+
+if (paymentDelay) {
+  paymentDelay.addEventListener("input", () => {
+    paymentDelayValue.textContent =
+      `${paymentDelay.value} days`;
+  });
+}
+
+if (resetButton) {
+  resetButton.addEventListener("click", () => {
+    dashboard.classList.add("hidden");
+    uploadInput.value = "";
+    fileName.textContent = "No file selected";
+    statusMessage.textContent = "";
+    errorMessage.textContent = "";
+    simulationResult.textContent =
+      "Adjust the assumptions and run a scenario.";
+    currentAnalysis = null;
+  });
+}
