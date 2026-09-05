@@ -1,316 +1,138 @@
-const uploadInput = document.getElementById("csvFile");
-const fileName = document.getElementById("fileName");
-const statusMessage = document.getElementById("statusMessage");
-const errorMessage = document.getElementById("errorMessage");
+"use strict";
 
-const dashboard = document.getElementById("dashboard");
-const cashValue = document.getElementById("cashValue");
-const receivablesValue = document.getElementById("receivablesValue");
-const billsValue = document.getElementById("billsValue");
+/* =========================================================
+   RIPPLE — Finance Control Workspace
+   ========================================================= */
 
-const actionsList = document.getElementById("actionsList");
-const riskSummary = document.getElementById("riskSummary");
-const dataQuality = document.getElementById("dataQuality");
-const evidenceList = document.getElementById("evidenceList");
+const $ = (id) => document.getElementById(id);
 
-const collectionRate = document.getElementById("collectionRate");
-const paymentDelay = document.getElementById("paymentDelay");
-const collectionRateValue = document.getElementById("collectionRateValue");
-const paymentDelayValue = document.getElementById("paymentDelayValue");
-const simulateButton = document.getElementById("simulateButton");
-const simulationResult = document.getElementById("simulationResult");
+const uploadInput = $("csvFile");
+const fileName = $("fileName");
+const statusMessage = $("statusMessage");
+const errorMessage = $("errorMessage");
 
-const resetButton = document.getElementById("resetButton");
-const sampleButton = document.getElementById("sampleButton");
+const welcomeModal = $("welcomeModal");
+const userNameInput = $("userNameInput");
+const saveNameButton = $("saveNameButton");
+const headerGreeting = $("headerGreeting");
+const heroDescription = $("heroDescription");
+
+const privacyModal = $("privacyModal");
+const openPrivacyButton = $("openPrivacyButton");
+const closePrivacyButton = $("closePrivacyButton");
+const saveAnalysesToggle = $("saveAnalysesToggle");
+const clearWorkspaceButton = $("clearWorkspaceButton");
+const privacyFeedback = $("privacyFeedback");
+
+const workspaceSection = $("workspaceSection");
+const workspaceTitle = $("workspaceTitle");
+const historyList = $("historyList");
+const historyCount = $("historyCount");
+const newAnalysisButton = $("newAnalysisButton");
+
+const dashboard = $("dashboard");
+const dashboardTitle = $("dashboardTitle");
+const dashboardSubtitle = $("dashboardSubtitle");
+
+const cashValue = $("cashValue");
+const receivablesValue = $("receivablesValue");
+const billsValue = $("billsValue");
+
+const riskSummary = $("riskSummary");
+const riskDescription = $("riskDescription");
+const riskScoreTag = $("riskScoreTag");
+const riskWarning = $("riskWarning");
+const riskWarningList = $("riskWarningList");
+const riskSuccess = $("riskSuccess");
+
+const dataQuality = $("dataQuality");
+const actionsList = $("actionsList");
+const evidenceList = $("evidenceList");
+
+const saveCurrentAnalysisButton = $("saveCurrentAnalysisButton");
+const deleteCurrentAnalysisButton = $("deleteCurrentAnalysisButton");
+const resetButton = $("resetButton");
+
+const chartContainer = $("chartContainer");
+const chartLegend = $("chartLegend");
+const chartTabs = document.querySelectorAll(".chart-tab");
+
+const collectionRate = $("collectionRate");
+const paymentDelay = $("paymentDelay");
+const collectionRateLabel = $("collectionRateLabel");
+const paymentDelayLabel = $("paymentDelayLabel");
+const simulateButton = $("simulateButton");
+const simulationResult = $("simulationResult");
+
+const sampleButton = $("sampleButton");
+
+const STORAGE_NAME = "ripple_user_name";
+const STORAGE_HISTORY = "ripple_analysis_history";
+const STORAGE_SAVE_SETTING = "ripple_save_setting";
 
 let currentAnalysis = null;
+let currentChart = "bar";
+let currentHistoryId = null;
 
-const aliases = {
-  date: [
-    "date",
-    "transaction date",
-    "invoice date",
-    "bill date",
-    "payment date"
-  ],
-
-  dueDate: [
-    "due date",
-    "payment due date",
-    "deadline",
-    "expected payment date"
-  ],
-
-  description: [
-    "description",
-    "details",
-    "particulars",
-    "narration",
-    "transaction description",
-    "name"
-  ],
-
-  customer: [
-    "customer",
-    "customer name",
-    "client",
-    "client name",
-    "buyer",
-    "buyer name"
-  ],
-
-  supplier: [
-    "supplier",
-    "supplier name",
-    "vendor",
-    "vendor name",
-    "payee"
-  ],
-
-  amount: [
-    "amount",
-    "total amount",
-    "invoice amount",
-    "bill amount",
-    "value",
-    "total"
-  ],
-
-  moneyIn: [
-    "money in",
-    "cash inflow",
-    "inflow",
-    "credit",
-    "credits",
-    "received",
-    "income",
-    "cash received"
-  ],
-
-  moneyOut: [
-    "money out",
-    "cash outflow",
-    "outflow",
-    "debit",
-    "debits",
-    "paid",
-    "expense",
-    "expenses",
-    "cash paid"
-  ],
-
-  outstanding: [
-    "outstanding",
-    "outstanding amount",
-    "balance due",
-    "amount due",
-    "unpaid amount",
-    "remaining amount"
-  ],
-
-  received: [
-    "amount received",
-    "received amount",
-    "amount paid",
-    "paid amount",
-    "collected",
-    "collection"
-  ],
-
-  essential: [
-    "essential",
-    "essential / non-essential",
-    "priority",
-    "critical",
-    "payment priority"
-  ],
-
-  openingCash: [
-    "opening cash",
-    "opening balance",
-    "starting cash",
-    "opening cash balance"
-  ],
-
-  closingCash: [
-    "closing cash",
-    "closing balance",
-    "ending cash",
-    "ending balance",
-    "cash balance"
-  ],
-
-  expectedCollections: [
-    "expected customer collections",
-    "expected collections",
-    "customer collections",
-    "expected receipts",
-    "forecast collections"
-  ],
-
-  otherInflows: [
-    "expected other inflows",
-    "other inflows",
-    "other income",
-    "other receipts"
-  ],
-
-  essentialPayments: [
-    "essential payments",
-    "essential outflows",
-    "critical payments",
-    "mandatory payments"
-  ],
-
-  nonEssentialPayments: [
-    "non-essential payments",
-    "non essential payments",
-    "discretionary payments",
-    "optional payments"
-  ]
-};
+/* =========================================================
+   General helpers
+   ========================================================= */
 
 function cleanText(value) {
   return String(value ?? "")
     .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .replace(/[_-]+/g, " ");
+    .replace(/\s+/g, " ");
 }
 
 function normaliseHeader(value) {
   return cleanText(value)
-    .replace(/[₹$€£,%()]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function findColumn(headers, possibleNames) {
-  const normalisedHeaders = headers.map(normaliseHeader);
-
-  for (const name of possibleNames) {
-    const target = normaliseHeader(name);
-    const exactIndex = normalisedHeaders.indexOf(target);
-
-    if (exactIndex !== -1) {
-      return headers[exactIndex];
-    }
-  }
-
-  for (const name of possibleNames) {
-    const target = normaliseHeader(name);
-
-    const partialIndex = normalisedHeaders.findIndex(header =>
-      header.includes(target) || target.includes(header)
-    );
-
-    if (partialIndex !== -1) {
-      return headers[partialIndex];
-    }
-  }
-
-  return null;
-}
-
-function getValue(row, column) {
-  if (!column) return "";
-  return row[column];
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 }
 
 function parseNumber(value) {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
 
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : null;
-  }
-
-  let text = String(value).trim();
-
-  if (!text) return null;
-
-  const isNegative =
-    text.includes("(") &&
-    text.includes(")");
-
-  text = text
-    .replace(/[₹$€£,\s]/g, "")
-    .replace(/[()]/g, "")
+  const cleaned = String(value ?? "")
+    .replace(/₹/g, "")
+    .replace(/,/g, "")
+    .replace(/%/g, "")
     .replace(/[^\d.-]/g, "");
 
-  if (!text || text === "-" || text === ".") {
-    return null;
-  }
-
-  const number = Number(text);
-
-  if (!Number.isFinite(number)) {
-    return null;
-  }
-
-  return isNegative ? -Math.abs(number) : number;
+  const number = Number(cleaned);
+  return Number.isFinite(number) ? number : 0;
 }
 
 function parseDate(value) {
   if (!value) return null;
 
-  if (value instanceof Date && !isNaN(value)) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return value;
   }
 
-  if (typeof value === "number") {
-    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
-    const date = new Date(
-      excelEpoch.getTime() + value * 86400000
-    );
+  const date = new Date(value);
 
-    return isNaN(date) ? null : date;
-  }
-
-  const text = String(value).trim();
-
-  const date = new Date(text);
-
-  if (!isNaN(date)) {
+  if (!Number.isNaN(date.getTime())) {
     return date;
-  }
-
-  const parts = text.split(/[\/.-]/);
-
-  if (parts.length === 3) {
-    const day = Number(parts[0]);
-    const month = Number(parts[1]) - 1;
-    const year = Number(parts[2]);
-
-    const parsed = new Date(year, month, day);
-
-    if (!isNaN(parsed)) {
-      return parsed;
-    }
   }
 
   return null;
 }
 
 function formatCurrency(value) {
-  if (value === null || value === undefined || !Number.isFinite(value)) {
-    return "Not available";
-  }
+  const amount = Number(value) || 0;
 
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0
-  }).format(value);
+  }).format(amount);
 }
 
 function formatDate(value) {
-  if (!value) return "Unknown date";
+  const date = parseDate(value);
 
-  const date = value instanceof Date ? value : parseDate(value);
-
-  if (!date) return "Unknown date";
+  if (!date) return "Date unavailable";
 
   return date.toLocaleDateString("en-IN", {
     day: "2-digit",
@@ -319,714 +141,1144 @@ function formatDate(value) {
   });
 }
 
-function isEssential(value) {
-  const text = cleanText(value);
-
-  if (
-    text.includes("non") ||
-    text.includes("optional") ||
-    text.includes("discretionary")
-  ) {
-    return false;
-  }
-
-  return (
-    text.includes("essential") ||
-    text.includes("critical") ||
-    text.includes("mandatory") ||
-    text.includes("high") ||
-    text === "yes" ||
-    text === "true"
-  );
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
-function isOverdue(row) {
-  const status = cleanText(row.status);
-
-  if (
-    status.includes("overdue") ||
-    status.includes("late") ||
-    status.includes("past due")
-  ) {
-    return true;
+function setStatus(message = "", isError = false) {
+  if (isError) {
+    errorMessage.textContent = message;
+    statusMessage.textContent = "";
+  } else {
+    statusMessage.textContent = message;
+    errorMessage.textContent = "";
   }
-
-  if (row.dueDate) {
-    const dueDate = parseDate(row.dueDate);
-
-    if (dueDate) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      return dueDate < today && (row.outstanding ?? 0) > 0;
-    }
-  }
-
-  return false;
 }
 
-function classifySheet(headers, rows) {
-  const headerText = headers.map(normaliseHeader).join(" ");
-
-  if (
-    headerText.includes("opening cash") ||
-    headerText.includes("closing cash") ||
-    headerText.includes("cash risk") ||
-    headerText.includes("expected customer collections")
-  ) {
-    return "forecast";
-  }
-
-  if (
-    headerText.includes("invoice") ||
-    headerText.includes("customer") ||
-    headerText.includes("amount received") ||
-    headerText.includes("invoice amount")
-  ) {
-    return "receivables";
-  }
-
-  if (
-    headerText.includes("bill number") ||
-    headerText.includes("supplier") ||
-    headerText.includes("bill amount") ||
-    headerText.includes("amount paid")
-  ) {
-    return "payables";
-  }
-
-  if (
-    headerText.includes("money in") ||
-    headerText.includes("money out") ||
-    headerText.includes("transaction id") ||
-    headerText.includes("transaction date")
-  ) {
-    return "transactions";
-  }
-
-  if (
-    headerText.includes("units in stock") ||
-    headerText.includes("inventory value") ||
-    headerText.includes("reorder level")
-  ) {
-    return "inventory";
-  }
-
-  const firstRows = rows
-    .slice(0, 5)
-    .map(row => Object.values(row).join(" ").toLowerCase())
-    .join(" ");
-
-  if (
-    firstRows.includes("invoice") &&
-    firstRows.includes("customer")
-  ) {
-    return "receivables";
-  }
-
-  if (
-    firstRows.includes("supplier") &&
-    firstRows.includes("bill")
-  ) {
-    return "payables";
-  }
-
-  return "unknown";
-}
-
-function normaliseTransactions(headers, rows) {
-  const dateColumn = findColumn(headers, aliases.date);
-  const descriptionColumn = findColumn(headers, aliases.description);
-  const moneyInColumn = findColumn(headers, aliases.moneyIn);
-  const moneyOutColumn = findColumn(headers, aliases.moneyOut);
-  const amountColumn = findColumn(headers, aliases.amount);
-
-  return rows
-    .map(row => {
-      let moneyIn = parseNumber(getValue(row, moneyInColumn));
-      let moneyOut = parseNumber(getValue(row, moneyOutColumn));
-
-      if (
-        moneyIn === null &&
-        moneyOut === null &&
-        amountColumn
-      ) {
-        const amount = parseNumber(getValue(row, amountColumn));
-        const description = cleanText(
-          getValue(row, descriptionColumn)
-        );
-
-        if (
-          description.includes("sale") ||
-          description.includes("receipt") ||
-          description.includes("income") ||
-          description.includes("collection") ||
-          description.includes("credit")
-        ) {
-          moneyIn = amount;
-          moneyOut = 0;
-        } else if (amount !== null) {
-          moneyIn = 0;
-          moneyOut = amount;
-        }
-      }
-
-      return {
-        date: parseDate(getValue(row, dateColumn)),
-        description: getValue(row, descriptionColumn),
-        moneyIn: moneyIn ?? 0,
-        moneyOut: moneyOut ?? 0
-      };
-    })
-    .filter(row =>
-      row.moneyIn !== 0 ||
-      row.moneyOut !== 0 ||
-      row.date
-    );
-}
-
-function normaliseReceivables(headers, rows) {
-  const customerColumn = findColumn(headers, aliases.customer);
-  const dateColumn = findColumn(headers, aliases.date);
-  const dueDateColumn = findColumn(headers, aliases.dueDate);
-  const amountColumn = findColumn(headers, [
-    "invoice amount",
-    "total invoice amount",
-    "amount"
-  ]);
-  const receivedColumn = findColumn(headers, aliases.received);
-  const outstandingColumn = findColumn(headers, aliases.outstanding);
-  const statusColumn = findColumn(headers, [
-    "payment status",
-    "status"
-  ]);
-  const priorityColumn = findColumn(headers, [
-    "customer priority",
-    "priority"
-  ]);
-
-  return rows
-    .map(row => {
-      const amount = parseNumber(getValue(row, amountColumn));
-      const received = parseNumber(getValue(row, receivedColumn));
-      let outstanding = parseNumber(
-        getValue(row, outstandingColumn)
-      );
-
-      if (outstanding === null && amount !== null) {
-        outstanding = Math.max(
-          amount - (received ?? 0),
-          0
-        );
-      }
-
-      return {
-        customer: getValue(row, customerColumn) || "Unnamed customer",
-        date: parseDate(getValue(row, dateColumn)),
-        dueDate: parseDate(getValue(row, dueDateColumn)),
-        amount: amount ?? 0,
-        received: received ?? 0,
-        outstanding: outstanding ?? 0,
-        status: getValue(row, statusColumn),
-        priority: getValue(row, priorityColumn)
-      };
-    })
-    .filter(row =>
-      row.outstanding > 0 ||
-      row.amount > 0 ||
-      row.customer !== "Unnamed customer"
-    );
-}
-
-function normalisePayables(headers, rows) {
-  const supplierColumn = findColumn(headers, aliases.supplier);
-  const dateColumn = findColumn(headers, aliases.date);
-  const dueDateColumn = findColumn(headers, aliases.dueDate);
-  const amountColumn = findColumn(headers, [
-    "bill amount",
-    "total bill amount",
-    "amount"
-  ]);
-  const paidColumn = findColumn(headers, aliases.received);
-  const outstandingColumn = findColumn(headers, aliases.outstanding);
-  const statusColumn = findColumn(headers, [
-    "payment status",
-    "status"
-  ]);
-  const essentialColumn = findColumn(headers, aliases.essential);
-
-  return rows
-    .map(row => {
-      const amount = parseNumber(getValue(row, amountColumn));
-      const paid = parseNumber(getValue(row, paidColumn));
-
-      let outstanding = parseNumber(
-        getValue(row, outstandingColumn)
-      );
-
-      if (outstanding === null && amount !== null) {
-        outstanding = Math.max(
-          amount - (paid ?? 0),
-          0
-        );
-      }
-
-      return {
-        supplier: getValue(row, supplierColumn) || "Unnamed supplier",
-        date: parseDate(getValue(row, dateColumn)),
-        dueDate: parseDate(getValue(row, dueDateColumn)),
-        amount: amount ?? 0,
-        paid: paid ?? 0,
-        outstanding: outstanding ?? 0,
-        status: getValue(row, statusColumn),
-        essential: isEssential(
-          getValue(row, essentialColumn)
-        )
-      };
-    })
-    .filter(row =>
-      row.outstanding > 0 ||
-      row.amount > 0 ||
-      row.supplier !== "Unnamed supplier"
-    );
-}
-
-function normaliseForecast(headers, rows) {
-  const dateColumn = findColumn(headers, aliases.date);
-  const openingColumn = findColumn(headers, aliases.openingCash);
-  const collectionsColumn = findColumn(
-    headers,
-    aliases.expectedCollections
-  );
-  const otherInflowsColumn = findColumn(
-    headers,
-    aliases.otherInflows
-  );
-  const essentialPaymentsColumn = findColumn(
-    headers,
-    aliases.essentialPayments
-  );
-  const nonEssentialPaymentsColumn = findColumn(
-    headers,
-    aliases.nonEssentialPayments
-  );
-  const closingColumn = findColumn(headers, aliases.closingCash);
-
-  return rows
-    .map(row => ({
-      date: parseDate(getValue(row, dateColumn)),
-      openingCash: parseNumber(
-        getValue(row, openingColumn)
-      ),
-      expectedCollections: parseNumber(
-        getValue(row, collectionsColumn)
-      ) ?? 0,
-      otherInflows: parseNumber(
-        getValue(row, otherInflowsColumn)
-      ) ?? 0,
-      essentialPayments: parseNumber(
-        getValue(row, essentialPaymentsColumn)
-      ) ?? 0,
-      nonEssentialPayments: parseNumber(
-        getValue(row, nonEssentialPaymentsColumn)
-      ) ?? 0,
-      closingCash: parseNumber(
-        getValue(row, closingColumn)
-      )
-    }))
-    .filter(row =>
-      row.date ||
-      row.openingCash !== null ||
-      row.closingCash !== null
+function getColumn(row, aliases) {
+  const keys = Object.keys(row);
+  const match = keys.find((key) =>
+    aliases.some(
+      (alias) => normaliseHeader(key) === normaliseHeader(alias)
     )
-    .sort((a, b) => {
-      if (!a.date || !b.date) return 0;
-      return a.date - b.date;
-    });
+  );
+
+  return match ? row[match] : null;
 }
 
-function inspectWorkbook(workbook) {
+function getDateFromRow(row) {
+  return (
+    getColumn(row, [
+      "date",
+      "transaction date",
+      "invoice date",
+      "due date",
+      "payment date"
+    ]) || null
+  );
+}
+
+function getAmountFromRow(row) {
+  return parseNumber(
+    getColumn(row, [
+      "amount",
+      "value",
+      "total",
+      "total amount",
+      "invoice amount",
+      "money in",
+      "money out",
+      "balance",
+      "outstanding"
+    ])
+  );
+}
+
+function getDescriptionFromRow(row) {
+  return cleanText(
+    getColumn(row, [
+      "description",
+      "details",
+      "particulars",
+      "customer",
+      "supplier",
+      "name",
+      "category"
+    ]) || "Financial item"
+  );
+}
+
+function getRowsFromSheet(sheet) {
+  return XLSX.utils.sheet_to_json(sheet, {
+    defval: ""
+  });
+}
+
+/* =========================================================
+   User identity and privacy
+   ========================================================= */
+
+function getUserName() {
+  return localStorage.getItem(STORAGE_NAME) || "";
+}
+
+function saveUserName() {
+  const name = cleanText(userNameInput.value);
+
+  if (!name) {
+    userNameInput.focus();
+    return;
+  }
+
+  localStorage.setItem(STORAGE_NAME, name);
+  welcomeModal.classList.add("hidden");
+  document.body.classList.remove("modal-open");
+
+  updatePersonalisation();
+}
+
+function updatePersonalisation() {
+  const name = getUserName();
+
+  if (name) {
+    headerGreeting.textContent = `Welcome back, ${name}`;
+    heroDescription.textContent =
+      `Your private finance workspace is ready, ${name}. Turn financial data into clear cash-flow insights and practical decisions.`;
+    workspaceTitle.textContent = `${name}'s analysis workspace.`;
+  } else {
+    headerGreeting.textContent = "Finance control workspace";
+  }
+}
+
+function openWelcomeModal() {
+  welcomeModal.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+
+  setTimeout(() => {
+    userNameInput.focus();
+  }, 100);
+}
+
+function openPrivacyModal() {
+  saveAnalysesToggle.checked =
+    localStorage.getItem(STORAGE_SAVE_SETTING) === "true";
+
+  privacyFeedback.textContent = "";
+  privacyModal.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+}
+
+function closePrivacyModal() {
+  privacyModal.classList.add("hidden");
+  document.body.classList.remove("modal-open");
+}
+
+function updateSavePreference() {
+  localStorage.setItem(
+    STORAGE_SAVE_SETTING,
+    String(saveAnalysesToggle.checked)
+  );
+
+  privacyFeedback.textContent = saveAnalysesToggle.checked
+    ? "Analyses will now be saved locally when you choose Save analysis."
+    : "Automatic local saving is turned off.";
+}
+
+function getSavedHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_HISTORY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(history) {
+  localStorage.setItem(STORAGE_HISTORY, JSON.stringify(history));
+}
+
+function clearWorkspace() {
+  const confirmed = window.confirm(
+    "Clear all saved analyses from this browser?"
+  );
+
+  if (!confirmed) return;
+
+  localStorage.removeItem(STORAGE_HISTORY);
+  renderHistory();
+  privacyFeedback.textContent = "Saved workspace cleared.";
+}
+
+/* =========================================================
+   Workbook processing
+   ========================================================= */
+
+function classifyRows(rows) {
   const result = {
     transactions: [],
     receivables: [],
     payables: [],
     forecast: [],
-    inventory: [],
-    unknownSheets: [],
-    warnings: [],
-    sheetCount: workbook.SheetNames.length
+    other: []
   };
 
-  workbook.SheetNames.forEach(sheetName => {
-    const sheet = workbook.Sheets[sheetName];
+  rows.forEach((row) => {
+    const headers = Object.keys(row)
+      .map(normaliseHeader)
+      .join(" ");
 
-    const rows = XLSX.utils.sheet_to_json(sheet, {
-      defval: "",
-      raw: true
-    });
+    const description = getDescriptionFromRow(row).toLowerCase();
 
-    if (!rows.length) {
-      result.warnings.push(
-        `${sheetName}: empty sheet ignored.`
-      );
+    const outstanding = parseNumber(
+      getColumn(row, ["outstanding", "balance", "amount due"])
+    );
+
+    const received = parseNumber(
+      getColumn(row, ["received", "paid", "collected", "amount received"])
+    );
+
+    const moneyIn = parseNumber(
+      getColumn(row, ["money in", "inflow", "income", "receipts"])
+    );
+
+    const moneyOut = parseNumber(
+      getColumn(row, ["money out", "outflow", "expense", "payments"])
+    );
+
+    const amount = getAmountFromRow(row);
+
+    if (
+      headers.includes("customer") ||
+      headers.includes("receivable") ||
+      headers.includes("invoice") ||
+      headers.includes("amountdue") ||
+      outstanding > 0 ||
+      received > 0
+    ) {
+      result.receivables.push({
+        ...row,
+        amount: outstanding || amount,
+        received,
+        date: getDateFromRow(row),
+        description
+      });
+
       return;
     }
 
-    const headers = Object.keys(rows[0]);
-    const type = classifySheet(headers, rows);
+    if (
+      headers.includes("supplier") ||
+      headers.includes("payable") ||
+      headers.includes("vendor") ||
+      headers.includes("bill") ||
+      headers.includes("expense")
+    ) {
+      result.payables.push({
+        ...row,
+        amount: amount || outstanding,
+        date: getDateFromRow(row),
+        description
+      });
 
-    if (type === "transactions") {
-      result.transactions.push(
-        ...normaliseTransactions(headers, rows)
-      );
-    } else if (type === "receivables") {
-      result.receivables.push(
-        ...normaliseReceivables(headers, rows)
-      );
-    } else if (type === "payables") {
-      result.payables.push(
-        ...normalisePayables(headers, rows)
-      );
-    } else if (type === "forecast") {
-      result.forecast.push(
-        ...normaliseForecast(headers, rows)
-      );
-    } else if (type === "inventory") {
-      result.inventory.push(...rows);
-    } else {
-      result.unknownSheets.push(sheetName);
+      return;
     }
+
+    if (
+      headers.includes("forecast") ||
+      headers.includes("openingcash") ||
+      headers.includes("closingcash") ||
+      headers.includes("expectedcollections")
+    ) {
+      result.forecast.push({
+        ...row,
+        amount,
+        date: getDateFromRow(row),
+        description
+      });
+
+      return;
+    }
+
+    if (moneyIn || moneyOut || amount) {
+      result.transactions.push({
+        ...row,
+        amount,
+        moneyIn,
+        moneyOut,
+        date: getDateFromRow(row),
+        description
+      });
+
+      return;
+    }
+
+    result.other.push(row);
   });
-
-  if (!result.transactions.length) {
-    result.warnings.push(
-      "No transaction sheet was confidently identified."
-    );
-  }
-
-  if (!result.receivables.length) {
-    result.warnings.push(
-      "No receivables data was confidently identified."
-    );
-  }
-
-  if (!result.payables.length) {
-    result.warnings.push(
-      "No payables data was confidently identified."
-    );
-  }
-
-  if (!result.forecast.length) {
-    result.warnings.push(
-      "No seven-day forecast was identified. Cash was estimated from available transactions."
-    );
-  }
 
   return result;
 }
 
-function calculateAnalysis(data) {
-  const totalInflow = data.transactions.reduce(
-    (sum, row) => sum + row.moneyIn,
+function calculateAnalysis(rows, sourceName, isDemo = false) {
+  const grouped = classifyRows(rows);
+
+  const transactionInflow = grouped.transactions.reduce(
+    (sum, row) => sum + (row.moneyIn || 0),
     0
   );
 
-  const totalOutflow = data.transactions.reduce(
-    (sum, row) => sum + row.moneyOut,
+  const transactionOutflow = grouped.transactions.reduce(
+    (sum, row) => sum + (row.moneyOut || 0),
     0
   );
 
-  const latestForecast =
-    data.forecast.length
-      ? data.forecast[data.forecast.length - 1]
-      : null;
+  const receivables = grouped.receivables.reduce(
+    (sum, row) => sum + Math.max(row.amount || 0, 0),
+    0
+  );
 
-  const forecastCash = latestForecast
-    ? latestForecast.closingCash
-    : null;
+  const received = grouped.receivables.reduce(
+    (sum, row) => sum + Math.max(row.received || 0, 0),
+    0
+  );
+
+  const payables = grouped.payables.reduce(
+    (sum, row) => sum + Math.max(row.amount || 0, 0),
+    0
+  );
+
+  const forecastCash = grouped.forecast.reduce(
+    (sum, row) => sum + (row.amount || 0),
+    0
+  );
+
+  const totalInflow = transactionInflow + received;
+  const totalOutflow = transactionOutflow + payables;
 
   const estimatedCash =
-    forecastCash !== null
-      ? forecastCash
-      : totalInflow - totalOutflow;
+    forecastCash || totalInflow - totalOutflow;
 
-  const totalReceivables = data.receivables.reduce(
-    (sum, row) => sum + row.outstanding,
+  const collectionRate =
+    receivables > 0
+      ? Math.round((received / receivables) * 100)
+      : 0;
+
+  const overdueReceivables = grouped.receivables.filter((row) => {
+    const date = parseDate(row.date);
+    return date && date < new Date() && row.amount > row.received;
+  });
+
+  const overdueAmount = overdueReceivables.reduce(
+    (sum, row) => sum + Math.max((row.amount || 0) - (row.received || 0), 0),
     0
   );
 
-  const totalPayables = data.payables.reduce(
-    (sum, row) => sum + row.outstanding,
+  const essentialPayables = grouped.payables
+    .filter((row) => {
+      const text = row.description.toLowerCase();
+
+      return (
+        text.includes("salary") ||
+        text.includes("rent") ||
+        text.includes("tax") ||
+        text.includes("electric") ||
+        text.includes("utility") ||
+        text.includes("supplier")
+      );
+    })
+    .reduce((sum, row) => sum + row.amount, 0);
+
+  const nonEssentialPayables = Math.max(
+    payables - essentialPayables,
     0
   );
-
-  const overdueReceivables = data.receivables
-    .filter(isOverdue)
-    .reduce((sum, row) => sum + row.outstanding, 0);
-
-  const essentialPayables = data.payables
-    .filter(row => row.essential)
-    .reduce((sum, row) => sum + row.outstanding, 0);
-
-  const nonEssentialPayables = data.payables
-    .filter(row => !row.essential)
-    .reduce((sum, row) => sum + row.outstanding, 0);
-
-  const forecastMinimumCash = data.forecast.length
-    ? Math.min(
-        ...data.forecast
-          .map(row => row.closingCash)
-          .filter(value => value !== null)
-      )
-    : estimatedCash;
 
   let riskScore = 0;
 
   if (estimatedCash < 0) riskScore += 45;
-  else if (estimatedCash < essentialPayables) riskScore += 30;
-  else if (estimatedCash < essentialPayables * 1.5) riskScore += 15;
+  else if (estimatedCash < payables * 0.5) riskScore += 30;
+  else if (estimatedCash < payables) riskScore += 15;
 
-  if (overdueReceivables > 0) riskScore += 20;
+  if (overdueAmount > receivables * 0.25) riskScore += 30;
+  else if (overdueAmount > 0) riskScore += 15;
 
-  if (forecastMinimumCash < 0) riskScore += 25;
-  else if (forecastMinimumCash < essentialPayables) riskScore += 15;
+  if (payables > receivables) riskScore += 15;
+  if (collectionRate < 50) riskScore += 10;
 
-  if (totalPayables > estimatedCash) riskScore += 15;
+  riskScore = Math.min(riskScore, 100);
 
-  let riskLevel = "Low";
+  let riskLevel = "low";
 
-  if (riskScore >= 60) {
-    riskLevel = "High";
-  } else if (riskScore >= 30) {
-    riskLevel = "Medium";
+  if (riskScore >= 65) riskLevel = "high";
+  else if (riskScore >= 35) riskLevel = "medium";
+
+  const warnings = [];
+
+  if (estimatedCash < 0) {
+    warnings.push("Estimated cash position is negative.");
   }
 
-  return {
-    ...data,
-    estimatedCash,
-    totalInflow,
-    totalOutflow,
-    totalReceivables,
-    totalPayables,
-    overdueReceivables,
-    essentialPayables,
-    nonEssentialPayables,
-    forecastMinimumCash,
-    riskScore,
-    riskLevel
-  };
-}
+  if (overdueAmount > 0) {
+    warnings.push(
+      `${formatCurrency(overdueAmount)} may be tied up in overdue receivables.`
+    );
+  }
 
-function createActions(analysis) {
+  if (payables > receivables) {
+    warnings.push("Upcoming obligations exceed recorded receivables.");
+  }
+
+  if (collectionRate < 50 && receivables > 0) {
+    warnings.push("Collection performance may need attention.");
+  }
+
   const actions = [];
 
-  if (analysis.overdueReceivables > 0) {
-    const largestOverdue = [...analysis.receivables]
-      .filter(isOverdue)
-      .sort((a, b) => b.outstanding - a.outstanding)[0];
-
-    actions.push({
-      title: "Prioritise overdue collections",
-      description:
-        `Follow up on overdue customer balances, starting with ${largestOverdue?.customer || "the largest overdue account"}.`,
-      value: formatCurrency(analysis.overdueReceivables),
-      type: "urgent"
-    });
+  if (overdueAmount > 0) {
+    actions.push(
+      `Prioritise follow-up on overdue receivables worth ${formatCurrency(overdueAmount)}.`
+    );
   }
 
-  if (
-    analysis.estimatedCash < analysis.essentialPayables ||
-    analysis.forecastMinimumCash < analysis.essentialPayables
-  ) {
-    actions.push({
-      title: "Protect essential payment coverage",
-      description:
-        "Review upcoming mandatory payments and confirm which obligations must be paid first.",
-      value: formatCurrency(analysis.essentialPayables),
-      type: "urgent"
-    });
+  if (nonEssentialPayables > 0) {
+    actions.push(
+      `Review or reschedule non-essential payments worth ${formatCurrency(nonEssentialPayables)}.`
+    );
   }
 
-  if (analysis.nonEssentialPayables > 0) {
-    actions.push({
-      title: "Defer discretionary outflows",
-      description:
-        "Consider delaying non-essential payments until collections improve.",
-      value: formatCurrency(analysis.nonEssentialPayables),
-      type: "watch"
-    });
+  if (collectionRate < 70 && receivables > 0) {
+    actions.push(
+      "Create a short collection plan for the largest outstanding customers."
+    );
   }
 
-  if (analysis.totalReceivables > 0) {
-    actions.push({
-      title: "Create a collection schedule",
-      description:
-        "Map expected customer receipts against payment due dates instead of relying only on total balances.",
-      value: formatCurrency(analysis.totalReceivables),
-      type: "recommended"
-    });
+  if (estimatedCash < 0) {
+    actions.push(
+      "Protect essential payments first and review near-term funding needs."
+    );
   }
 
   if (!actions.length) {
-    actions.push({
-      title: "Maintain current controls",
-      description:
-        "The available data does not show an immediate liquidity exception. Continue monitoring cash timing.",
-      value: "Monitor",
-      type: "recommended"
-    });
+    actions.push(
+      "Continue monitoring collections, upcoming bills, and cash movements."
+    );
   }
 
-  return actions;
+  const evidence = [
+    `${grouped.transactions.length} transaction records reviewed.`,
+    `${grouped.receivables.length} receivable records identified.`,
+    `${grouped.payables.length} payable records identified.`
+  ];
+
+  if (grouped.forecast.length) {
+    evidence.push(`${grouped.forecast.length} forecast records included.`);
+  }
+
+  if (isDemo) {
+    evidence.push("This analysis uses fictional demonstration data.");
+  } else {
+    evidence.push("Analysis is based only on the uploaded file.");
+  }
+
+  return {
+    id: crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`,
+    sourceName,
+    createdAt: new Date().toISOString(),
+    isDemo,
+    rows,
+    grouped,
+    metrics: {
+      estimatedCash,
+      receivables,
+      payables,
+      received,
+      totalInflow,
+      totalOutflow,
+      collectionRate,
+      overdueAmount,
+      essentialPayables,
+      nonEssentialPayables,
+      riskScore,
+      riskLevel
+    },
+    warnings,
+    actions,
+    evidence
+  };
 }
 
-function createEvidence(analysis) {
-  const evidence = [];
-
-  if (analysis.forecast.length) {
-    evidence.push(
-      `Seven-day forecast minimum closing cash: ${formatCurrency(
-        analysis.forecastMinimumCash
-      )}.`
-    );
-  }
-
-  if (analysis.overdueReceivables > 0) {
-    evidence.push(
-      `Overdue receivables identified: ${formatCurrency(
-        analysis.overdueReceivables
-      )}.`
-    );
-  }
-
-  if (analysis.essentialPayables > 0) {
-    evidence.push(
-      `Essential outstanding payables: ${formatCurrency(
-        analysis.essentialPayables
-      )}.`
-    );
-  }
-
-  if (analysis.nonEssentialPayables > 0) {
-    evidence.push(
-      `Non-essential outstanding payables: ${formatCurrency(
-        analysis.nonEssentialPayables
-      )}.`
-    );
-  }
-
-  evidence.push(
-    `Transactions analysed: ${analysis.transactions.length}.`
-  );
-
-  evidence.push(
-    `Receivable records analysed: ${analysis.receivables.length}.`
-  );
-
-  evidence.push(
-    `Payable records analysed: ${analysis.payables.length}.`
-  );
-
-  return evidence;
-}
+/* =========================================================
+   Rendering
+   ========================================================= */
 
 function renderAnalysis(analysis) {
   currentAnalysis = analysis;
+  currentHistoryId = analysis.id;
 
+  workspaceSection.classList.remove("hidden");
   dashboard.classList.remove("hidden");
 
+  dashboardTitle.textContent = analysis.isDemo
+    ? "Explore a fictional cash position."
+    : "Your cash position, clearly.";
+
+  dashboardSubtitle.textContent = analysis.isDemo
+    ? "A fictional example showing how RIPPLE turns financial data into decisions."
+    : `Analysis based on ${analysis.sourceName}.`;
+
   cashValue.textContent = formatCurrency(
-    analysis.estimatedCash
+    analysis.metrics.estimatedCash
   );
 
   receivablesValue.textContent = formatCurrency(
-    analysis.totalReceivables
+    analysis.metrics.receivables
   );
 
   billsValue.textContent = formatCurrency(
-    analysis.totalPayables
+    analysis.metrics.payables
   );
 
-  riskSummary.innerHTML = `
-    <div class="risk-card risk-${analysis.riskLevel.toLowerCase()}">
-      <div>
-        <span class="risk-label">Liquidity risk</span>
-        <strong>${analysis.riskLevel}</strong>
+  const riskLevel = analysis.metrics.riskLevel;
+  riskSummary.className = `risk-badge ${riskLevel}`;
+  riskSummary.textContent =
+    `${riskLevel.charAt(0).toUpperCase()}${riskLevel.slice(1)} risk`;
+
+  riskScoreTag.textContent =
+    `Score ${analysis.metrics.riskScore}`;
+
+  riskDescription.textContent =
+    riskLevel === "high"
+      ? "The current data suggests a meaningful liquidity pressure that needs attention."
+      : riskLevel === "medium"
+        ? "The current data suggests some pressure points worth monitoring."
+        : "The current position appears manageable based on the information provided.";
+
+  riskWarningList.innerHTML = analysis.warnings
+    .map((warning) => `<li>${escapeHTML(warning)}</li>`)
+    .join("");
+
+  riskWarning.classList.toggle(
+    "hidden",
+    analysis.warnings.length === 0
+  );
+
+  riskSuccess.classList.toggle(
+    "hidden",
+    analysis.warnings.length > 0
+  );
+
+  dataQuality.textContent = analysis.rows.length
+    ? `${analysis.rows.length} rows reviewed`
+    : "Limited data";
+
+  actionsList.innerHTML = analysis.actions
+    .map((action) => `<li>${escapeHTML(action)}</li>`)
+    .join("");
+
+  evidenceList.innerHTML = analysis.evidence
+    .map((item) => `<li>${escapeHTML(item)}</li>`)
+    .join("");
+
+  collectionRate.value = 0;
+  paymentDelay.value = 0;
+  collectionRateLabel.textContent = "0%";
+  paymentDelayLabel.textContent = "0 days";
+
+  renderChart(currentChart);
+  updateSimulation();
+
+  dashboard.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
+function renderHistory() {
+  const history = getSavedHistory();
+
+  historyCount.textContent =
+    `${history.length} saved`;
+
+  if (!history.length) {
+    historyList.innerHTML = `
+      <div class="empty-history">
+        <span>◌</span>
+        <p>Your saved analyses will appear here.</p>
       </div>
-      <div class="risk-score">
-        Score ${analysis.riskScore}/100
+    `;
+    return;
+  }
+
+  historyList.innerHTML = history
+    .map(
+      (item) => `
+        <button
+          type="button"
+          class="history-item ${
+            item.id === currentHistoryId ? "active" : ""
+          }"
+          data-history-id="${escapeHTML(item.id)}"
+        >
+          <span class="history-item-name">
+            ${escapeHTML(item.sourceName)}
+          </span>
+
+          <span class="history-item-meta">
+            ${formatDate(item.createdAt)}
+          </span>
+        </button>
+      `
+    )
+    .join("");
+
+  document.querySelectorAll(".history-item").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.dataset.historyId;
+      const selected = history.find((item) => item.id === id);
+
+      if (selected) {
+        renderAnalysis(selected);
+        renderHistory();
+      }
+    });
+  });
+}
+
+function saveCurrentAnalysis() {
+  if (!currentAnalysis) return;
+
+  const history = getSavedHistory();
+  const existingIndex = history.findIndex(
+    (item) => item.id === currentAnalysis.id
+  );
+
+  if (existingIndex >= 0) {
+    history[existingIndex] = currentAnalysis;
+  } else {
+    history.unshift(currentAnalysis);
+  }
+
+  saveHistory(history);
+  renderHistory();
+
+  setStatus("Analysis saved locally in your workspace.");
+}
+
+function deleteCurrentAnalysis() {
+  if (!currentAnalysis) return;
+
+  const confirmed = window.confirm(
+    "Delete this saved analysis from your workspace?"
+  );
+
+  if (!confirmed) return;
+
+  const history = getSavedHistory().filter(
+    (item) => item.id !== currentAnalysis.id
+  );
+
+  saveHistory(history);
+  currentHistoryId = null;
+  renderHistory();
+
+  setStatus("Saved analysis deleted.");
+}
+
+function resetWorkspace() {
+  currentAnalysis = null;
+  currentHistoryId = null;
+
+  dashboard.classList.add("hidden");
+  workspaceSection.classList.add("hidden");
+
+  uploadInput.value = "";
+  fileName.textContent = "No file selected";
+  setStatus("");
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+}
+
+/* =========================================================
+   Charts
+   ========================================================= */
+
+function getChartData() {
+  if (!currentAnalysis) return [];
+
+  const metrics = currentAnalysis.metrics;
+
+  return [
+    {
+      label: "Cash",
+      value: Math.max(metrics.estimatedCash, 0)
+    },
+    {
+      label: "Receivables",
+      value: metrics.receivables
+    },
+    {
+      label: "Bills",
+      value: metrics.payables
+    }
+  ];
+}
+
+function renderChart(type = "bar") {
+  currentChart = type;
+
+  chartTabs.forEach((tab) => {
+    tab.classList.toggle(
+      "active",
+      tab.dataset.chart === type
+    );
+  });
+
+  const data = getChartData();
+
+  if (!data.length) {
+    chartContainer.innerHTML = `
+      <div class="chart-empty">
+        Your chart will appear after an analysis is loaded.
       </div>
-    </div>
-    <p>
-      Minimum forecast cash is
-      <strong>${formatCurrency(analysis.forecastMinimumCash)}</strong>.
-      Essential outstanding payments total
-      <strong>${formatCurrency(analysis.essentialPayables)}</strong>.
-    </p>
+    `;
+    chartLegend.innerHTML = "";
+    return;
+  }
+
+  if (type === "pie") {
+    renderPieChart(data);
+  } else if (type === "line") {
+    renderLineChart(data);
+  } else {
+    renderBarChart(data);
+  }
+}
+
+function renderBarChart(data) {
+  const width = 700;
+  const height = 280;
+  const padding = 45;
+  const max = Math.max(...data.map((item) => item.value), 1);
+  const chartHeight = height - padding * 2;
+  const barWidth = 100;
+  const gap = 65;
+
+  const bars = data
+    .map((item, index) => {
+      const barHeight = (item.value / max) * chartHeight;
+      const x = padding + index * (barWidth + gap);
+      const y = height - padding - barHeight;
+
+      return `
+        <rect
+          class="chart-bar"
+          x="${x}"
+          y="${y}"
+          width="${barWidth}"
+          height="${barHeight}"
+          rx="8"
+        ></rect>
+
+        <text
+          class="chart-value"
+          x="${x + barWidth / 2}"
+          y="${Math.max(y - 10, 15)}"
+          text-anchor="middle"
+        >
+          ${escapeHTML(formatCurrency(item.value))}
+        </text>
+
+        <text
+          class="chart-label"
+          x="${x + barWidth / 2}"
+          y="${height - 15}"
+          text-anchor="middle"
+        >
+          ${escapeHTML(item.label)}
+        </text>
+      `;
+    })
+    .join("");
+
+  chartContainer.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img">
+      <line
+        class="chart-axis"
+        x1="${padding}"
+        y1="${height - padding}"
+        x2="${width - padding}"
+        y2="${height - padding}"
+      ></line>
+      ${bars}
+    </svg>
   `;
 
-  const actions = createActions(analysis);
+  renderLegend(data);
+}
 
-  actionsList.innerHTML = actions
-    .map(action => `
-      <div class="action-item action-${action.type}">
-        <div class="action-topline">
-          <span class="action-type">${action.type}</span>
-          <strong>${action.value}</strong>
+function renderLineChart(data) {
+  const width = 700;
+  const height = 280;
+  const padding = 45;
+  const max = Math.max(...data.map((item) => item.value), 1);
+  const chartWidth = width - padding * 2;
+  const chartHeight = height - padding * 2;
+
+  const points = data.map((item, index) => {
+    const x = padding + (index * chartWidth) / (data.length - 1);
+    const y =
+      height -
+      padding -
+      (item.value / max) * chartHeight;
+
+    return { ...item, x, y };
+  });
+
+  const pointString = points
+    .map((point) => `${point.x},${point.y}`)
+    .join(" ");
+
+  const pointMarkup = points
+    .map(
+      (point) => `
+        <circle
+          class="chart-point"
+          cx="${point.x}"
+          cy="${point.y}"
+          r="5"
+        ></circle>
+
+        <text
+          class="chart-value"
+          x="${point.x}"
+          y="${point.y - 13}"
+          text-anchor="middle"
+        >
+          ${escapeHTML(formatCurrency(point.value))}
+        </text>
+
+        <text
+          class="chart-label"
+          x="${point.x}"
+          y="${height - 15}"
+          text-anchor="middle"
+        >
+          ${escapeHTML(point.label)}
+        </text>
+      `
+    )
+    .join("");
+
+  chartContainer.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img">
+      <line
+        class="chart-axis"
+        x1="${padding}"
+        y1="${height - padding}"
+        x2="${width - padding}"
+        y2="${height - padding}"
+      ></line>
+
+      <polyline
+        class="chart-line"
+        points="${pointString}"
+      ></polyline>
+
+      ${pointMarkup}
+    </svg>
+  `;
+
+  renderLegend(data);
+}
+
+function renderPieChart(data) {
+  const total = data.reduce((sum, item) => sum + item.value, 0) || 1;
+  const center = 140;
+  const radius = 90;
+
+  let currentAngle = -Math.PI / 2;
+
+  const segments = data
+    .map((item, index) => {
+      const angle = (item.value / total) * Math.PI * 2;
+      const endAngle = currentAngle + angle;
+
+      const x1 = center + radius * Math.cos(currentAngle);
+      const y1 = center + radius * Math.sin(currentAngle);
+      const x2 = center + radius * Math.cos(endAngle);
+      const y2 = center + radius * Math.sin(endAngle);
+
+      const largeArc = angle > Math.PI ? 1 : 0;
+
+      const path = `
+        M ${center} ${center}
+        L ${x1} ${y1}
+        A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}
+        Z
+      `;
+
+      currentAngle = endAngle;
+
+      return `
+        <path
+          class="chart-pie-segment"
+          d="${path}"
+          fill="var(--${index === 0 ? "purple" : index === 1 ? "purple-light" : "green"})"
+        ></path>
+      `;
+    })
+    .join("");
+
+  chartContainer.innerHTML = `
+    <svg viewBox="0 0 700 280" role="img">
+      <g transform="translate(210 0)">
+        ${segments}
+
+        <circle
+          cx="${center}"
+          cy="${center}"
+          r="42"
+          fill="var(--surface)"
+        ></circle>
+
+        <text
+          class="chart-label"
+          x="${center}"
+          y="${center - 4}"
+          text-anchor="middle"
+        >
+          Total
+        </text>
+
+        <text
+          class="chart-value"
+          x="${center}"
+          y="${center + 15}"
+          text-anchor="middle"
+        >
+          ${escapeHTML(formatCurrency(total))}
+        </text>
+      </g>
+    </svg>
+  `;
+
+  renderLegend(data);
+}
+
+function renderLegend(data) {
+  chartLegend.innerHTML = data
+    .map(
+      (item, index) => `
+        <div class="legend-item">
+          <span
+            class="legend-dot"
+            style="background: ${
+              index === 0
+                ? "var(--purple)"
+                : index === 1
+                  ? "var(--purple-light)"
+                  : "var(--green)"
+            }"
+          ></span>
+          <span>${escapeHTML(item.label)}</span>
         </div>
-        <h3>${action.title}</h3>
-        <p>${action.description}</p>
-      </div>
-    `)
+      `
+    )
     .join("");
+}
 
-  const warnings = analysis.warnings.length
-    ? analysis.warnings
-        .map(warning => `<li>${warning}</li>`)
-        .join("")
-    : "<li>No major data-quality warnings detected.</li>";
+/* =========================================================
+   Live scenario simulator
+   ========================================================= */
 
-  dataQuality.innerHTML = `
-    <div class="quality-summary">
-      <strong>${analysis.sheetCount}</strong>
-      <span>Sheets scanned</span>
-    </div>
-    <div class="quality-summary">
-      <strong>${analysis.transactions.length}</strong>
-      <span>Transactions</span>
-    </div>
-    <div class="quality-summary">
-      <strong>${analysis.receivables.length}</strong>
-      <span>Receivable records</span>
-    </div>
-    <div class="quality-summary">
-      <strong>${analysis.payables.length}</strong>
-      <span>Payable records</span>
-    </div>
-    <ul class="warning-list">${warnings}</ul>
+function updateSimulation() {
+  if (!currentAnalysis) return;
+
+  const collectionImprovement = Number(collectionRate.value);
+  const delayDays = Number(paymentDelay.value);
+
+  collectionRateLabel.textContent =
+    `${collectionImprovement}%`;
+
+  paymentDelayLabel.textContent =
+    `${delayDays} day${delayDays === 1 ? "" : "s"}`;
+
+  const metrics = currentAnalysis.metrics;
+
+  const additionalCollections =
+    metrics.receivables * (collectionImprovement / 100);
+
+  const delayedPayments =
+    metrics.nonEssentialPayables *
+    Math.min(delayDays / 30, 1);
+
+  const projectedCash =
+    metrics.estimatedCash +
+    additionalCollections +
+    delayedPayments;
+
+  const remainingReceivables = Math.max(
+    metrics.receivables -
+      metrics.received -
+      additionalCollections,
+    0
+  );
+
+  const resultClass =
+    projectedCash >= metrics.estimatedCash
+      ? "is-positive"
+      : "is-warning";
+
+  simulationResult.className =
+    `simulation-result ${resultClass}`;
+
+  simulationResult.innerHTML = `
+    With a <strong>${collectionImprovement}% collection improvement</strong>
+    and a <strong>${delayDays}-day payment delay</strong>:
+
+    <br /><br />
+
+    Projected cash position:
+    <strong>${escapeHTML(formatCurrency(projectedCash))}</strong>
+
+    <br />
+
+    Additional collections:
+    <strong>${escapeHTML(formatCurrency(additionalCollections))}</strong>
+
+    <br />
+
+    Payments deferred:
+    <strong>${escapeHTML(formatCurrency(delayedPayments))}</strong>
+
+    <br />
+
+    Remaining receivables:
+    <strong>${escapeHTML(formatCurrency(remainingReceivables))}</strong>
   `;
-
-  evidenceList.innerHTML = createEvidence(analysis)
-    .map(item => `<li>${item}</li>`)
-    .join("");
-
-  statusMessage.textContent =
-    "Analysis complete. Review the evidence before acting.";
-
-  errorMessage.textContent = "";
 }
 
-function showError(message) {
-  errorMessage.textContent = message;
-  statusMessage.textContent = "";
+function runSimulation() {
+  updateSimulation();
 }
+
+/* =========================================================
+   Fictional demo data
+   ========================================================= */
+
+function createSampleRows() {
+  return [
+    {
+      Date: "2026-09-01",
+      Customer: "Urban Nest Retail",
+      Amount: 145000,
+      Received: 45000,
+      Outstanding: 100000
+    },
+    {
+      Date: "2026-08-20",
+      Customer: "The Home Story",
+      Amount: 92000,
+      Received: 20000,
+      Outstanding: 72000
+    },
+    {
+      Date: "2026-08-15",
+      Customer: "Casa Bella Interiors",
+      Amount: 68000,
+      Received: 68000,
+      Outstanding: 0
+    },
+    {
+      Date: "2026-09-05",
+      Supplier: "Jaipur Blue Pottery Works",
+      Amount: 54000
+    },
+    {
+      Date: "2026-09-07",
+      Supplier: "BESCOM",
+      Amount: 18000
+    },
+    {
+      Date: "2026-09-10",
+      Supplier: "Office and operations",
+      Amount: 27000
+    },
+    {
+      Date: "2026-09-02",
+      Description: "Customer collections",
+      MoneyIn: 68000,
+      MoneyOut: 0
+    },
+    {
+      Date: "2026-09-03",
+      Description: "Operating expenses",
+      MoneyIn: 0,
+      MoneyOut: 22000
+    },
+    {
+      Date: "2026-09-04",
+      Description: "Opening cash balance",
+      MoneyIn: 0,
+      MoneyOut: 0,
+      Amount: 185000
+    }
+  ];
+}
+
+function loadSampleData() {
+  const rows = createSampleRows();
+
+  fileName.textContent = "Fictional RIPPLE demo workspace";
+  setStatus("Fictional demonstration data loaded.");
+
+  const analysis = calculateAnalysis(
+    rows,
+    "Fictional RIPPLE demo workspace",
+    true
+  );
+
+  renderAnalysis(analysis);
+}
+
+/* =========================================================
+   File upload
+   ========================================================= */
 
 async function processFile(file) {
   if (!file) return;
 
+  if (!window.XLSX) {
+    setStatus(
+      "The spreadsheet reader is still loading. Please try again.",
+      true
+    );
+    return;
+  }
+
+  const validExtensions = [".xlsx", ".xls", ".csv"];
+  const extension = file.name
+    .toLowerCase()
+    .slice(file.name.lastIndexOf("."));
+
+  if (!validExtensions.includes(extension)) {
+    setStatus(
+      "Please upload an Excel or CSV file.",
+      true
+    );
+    return;
+  }
+
   try {
-    errorMessage.textContent = "";
-    statusMessage.textContent = "Reading and understanding your file...";
+    setStatus("Reading your financial file...");
     fileName.textContent = file.name;
 
     const buffer = await file.arrayBuffer();
@@ -1036,247 +1288,145 @@ async function processFile(file) {
       cellDates: true
     });
 
-    const data = inspectWorkbook(workbook);
-    const analysis = calculateAnalysis(data);
+    const allRows = [];
+
+    workbook.SheetNames.forEach((sheetName) => {
+      const sheet = workbook.Sheets[sheetName];
+      const rows = getRowsFromSheet(sheet);
+
+      rows.forEach((row) => {
+        allRows.push(row);
+      });
+    });
+
+    if (!allRows.length) {
+      throw new Error("No readable rows were found in this file.");
+    }
+
+    const analysis = calculateAnalysis(
+      allRows,
+      file.name,
+      false
+    );
+
+    setStatus(
+      `Analysis complete. ${allRows.length} rows reviewed.`
+    );
 
     renderAnalysis(analysis);
   } catch (error) {
     console.error(error);
 
-    showError(
-      "The file could not be analysed. Please check that it is a valid Excel or CSV file."
+    setStatus(
+      error.message ||
+        "Something went wrong while reading the file.",
+      true
     );
   }
 }
 
-function createSampleWorkbook() {
-  return {
-    transactions: [
-      {
-        date: new Date("2026-09-05"),
-        description: "Customer collection",
-        moneyIn: 45000,
-        moneyOut: 0
-      },
-      {
-        date: new Date("2026-09-05"),
-        description: "Other income",
-        moneyIn: 18000,
-        moneyOut: 0
-      },
-      {
-        date: new Date("2026-09-06"),
-        description: "Supplier payment",
-        moneyIn: 0,
-        moneyOut: 69000
-      },
-      {
-        date: new Date("2026-09-07"),
-        description: "Essential supplier payment",
-        moneyIn: 0,
-        moneyOut: 257700
-      }
-    ],
+/* =========================================================
+   Event listeners
+   ========================================================= */
 
-    receivables: [
-      {
-        customer: "Urban Nest Retail",
-        date: new Date("2026-08-01"),
-        dueDate: new Date("2026-08-25"),
-        amount: 125000,
-        received: 0,
-        outstanding: 125000,
-        status: "Overdue",
-        priority: "High"
-      },
-      {
-        customer: "The Home Story",
-        date: new Date("2026-08-10"),
-        dueDate: new Date("2026-09-10"),
-        amount: 68000,
-        received: 0,
-        outstanding: 68000,
-        status: "Not Due",
-        priority: "Medium"
-      },
-      {
-        customer: "Casa Bella Interiors",
-        date: new Date("2026-08-05"),
-        dueDate: new Date("2026-08-28"),
-        amount: 106000,
-        received: 0,
-        outstanding: 106000,
-        status: "Overdue",
-        priority: "High"
-      }
-    ],
+saveNameButton.addEventListener("click", saveUserName);
 
-    payables: [
-      {
-        supplier: "Jaipur Blue Pottery Works",
-        date: new Date("2026-08-20"),
-        dueDate: new Date("2026-09-07"),
-        amount: 145000,
-        paid: 0,
-        outstanding: 145000,
-        status: "Due Soon",
-        essential: true
-      },
-      {
-        supplier: "BESCOM",
-        date: new Date("2026-08-20"),
-        dueDate: new Date("2026-09-08"),
-        amount: 16800,
-        paid: 0,
-        outstanding: 16800,
-        status: "Due Soon",
-        essential: true
-      },
-      {
-        supplier: "Meta Platforms",
-        date: new Date("2026-08-20"),
-        dueDate: new Date("2026-09-07"),
-        amount: 22000,
-        paid: 0,
-        outstanding: 22000,
-        status: "Due Soon",
-        essential: false
-      }
-    ],
-
-    forecast: [
-      {
-        date: new Date("2026-09-05"),
-        openingCash: 301298.7,
-        expectedCollections: 45000,
-        otherInflows: 18000,
-        essentialPayments: 69000,
-        nonEssentialPayments: 0,
-        closingCash: 295298.7
-      },
-      {
-        date: new Date("2026-09-07"),
-        openingCash: 278898.7,
-        expectedCollections: 0,
-        otherInflows: 8000,
-        essentialPayments: 257700,
-        nonEssentialPayments: 22000,
-        closingCash: 7198.7
-      },
-      {
-        date: new Date("2026-09-08"),
-        openingCash: 7198.7,
-        expectedCollections: 125000,
-        otherInflows: 20000,
-        essentialPayments: 16800,
-        nonEssentialPayments: 0,
-        closingCash: 135398.7
-      }
-    ],
-
-    inventory: [],
-    unknownSheets: [],
-    warnings: [],
-    sheetCount: 5
-  };
-}
-
-function loadSampleData() {
-  const sample = createSampleWorkbook();
-  const analysis = calculateAnalysis(sample);
-
-  fileName.textContent = "RIPPLE sample workspace";
-  renderAnalysis(analysis);
-}
-
-function runSimulation() {
-  if (!currentAnalysis) {
-    simulationResult.textContent =
-      "Upload a file or load the sample workspace first.";
-    return;
+userNameInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    saveUserName();
   }
+});
 
-  const collectionMultiplier =
-    Number(collectionRate.value) / 100;
+openPrivacyButton.addEventListener("click", openPrivacyModal);
 
-  const delayDays = Number(paymentDelay.value);
+closePrivacyButton.addEventListener("click", closePrivacyModal);
 
-  const baseCash = currentAnalysis.estimatedCash;
+privacyModal.addEventListener("click", (event) => {
+  if (event.target === privacyModal) {
+    closePrivacyModal();
+  }
+});
 
-  const additionalCollections =
-    currentAnalysis.totalReceivables *
-    collectionMultiplier;
+saveAnalysesToggle.addEventListener(
+  "change",
+  updateSavePreference
+);
 
-  const delayedPayments =
-    currentAnalysis.nonEssentialPayables *
-    Math.min(delayDays / 30, 1);
+clearWorkspaceButton.addEventListener(
+  "click",
+  clearWorkspace
+);
 
-  const simulatedCash =
-    baseCash +
-    additionalCollections +
-    delayedPayments;
+uploadInput.addEventListener("change", (event) => {
+  processFile(event.target.files[0]);
+});
 
-  const improvement =
-    simulatedCash - baseCash;
+sampleButton.addEventListener("click", loadSampleData);
 
-  simulationResult.innerHTML = `
-    <div class="simulation-number">
-      ${formatCurrency(simulatedCash)}
-    </div>
-    <p>
-      Estimated cash after collecting
-      <strong>${collectionRate.value}%</strong>
-      of outstanding receivables and delaying selected payments by
-      <strong>${delayDays} days</strong>.
-    </p>
-    <p class="simulation-improvement">
-      Potential cash improvement:
-      <strong>${formatCurrency(improvement)}</strong>
-    </p>
-    <small>
-      This is a scenario estimate, not a guaranteed outcome.
-    </small>
-  `;
-}
+saveCurrentAnalysisButton.addEventListener(
+  "click",
+  saveCurrentAnalysis
+);
 
-if (uploadInput) {
-  uploadInput.addEventListener("change", event => {
-    const file = event.target.files[0];
-    processFile(file);
+deleteCurrentAnalysisButton.addEventListener(
+  "click",
+  deleteCurrentAnalysis
+);
+
+resetButton.addEventListener(
+  "click",
+  resetWorkspace
+);
+
+newAnalysisButton.addEventListener(
+  "click",
+  resetWorkspace
+);
+
+simulateButton.addEventListener(
+  "click",
+  runSimulation
+);
+
+collectionRate.addEventListener(
+  "input",
+  updateSimulation
+);
+
+paymentDelay.addEventListener(
+  "input",
+  updateSimulation
+);
+
+chartTabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    renderChart(tab.dataset.chart);
   });
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closePrivacyModal();
+  }
+});
+
+/* =========================================================
+   Initialisation
+   ========================================================= */
+
+function initialise() {
+  updatePersonalisation();
+  renderHistory();
+
+  const savedPreference =
+    localStorage.getItem(STORAGE_SAVE_SETTING);
+
+  saveAnalysesToggle.checked =
+    savedPreference === "true";
+
+  if (!getUserName()) {
+    openWelcomeModal();
+  }
 }
 
-if (sampleButton) {
-  sampleButton.addEventListener("click", loadSampleData);
-}
-
-if (simulateButton) {
-  simulateButton.addEventListener("click", runSimulation);
-}
-
-if (collectionRate) {
-  collectionRate.addEventListener("input", () => {
-    collectionRateValue.textContent =
-      `${collectionRate.value}%`;
-  });
-}
-
-if (paymentDelay) {
-  paymentDelay.addEventListener("input", () => {
-    paymentDelayValue.textContent =
-      `${paymentDelay.value} days`;
-  });
-}
-
-if (resetButton) {
-  resetButton.addEventListener("click", () => {
-    dashboard.classList.add("hidden");
-    uploadInput.value = "";
-    fileName.textContent = "No file selected";
-    statusMessage.textContent = "";
-    errorMessage.textContent = "";
-    simulationResult.textContent =
-      "Adjust the assumptions and run a scenario.";
-    currentAnalysis = null;
-  });
-}
+initialise();
